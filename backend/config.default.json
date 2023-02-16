@@ -1,0 +1,4 @@
+{
+    "TESTING":true,
+    "ELECTRA_CHECKPOINT":"path-to-checkpoint"
+}
