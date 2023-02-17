@@ -4,7 +4,10 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import { useEffect, useRef } from "react";
 import { Network } from "vis-network";
-
+import Tab from '@mui/material/Tab';
+import TabContext from '@mui/lab/TabContext';
+import TabList from '@mui/lab/TabList';
+import TabPanel from '@mui/lab/TabPanel';
 
 const VisNetwork = (graph) => {
 
@@ -15,11 +18,34 @@ const VisNetwork = (graph) => {
 			new Network(visJsRef.current, graph.graph, {physics: {enabled:false}} );
 	}, [visJsRef, graph]);
 
-	return <td><Box><div ref={visJsRef} /></Box></td>;
+	return <Box sx={{ width: '100%', typography: 'body1' }}><div ref={visJsRef} /></Box>;
 };
 
 const LayerComponent = (layer) => {
+    console.log(layer);
     return <Grid> {layer.layer.map((g) => <VisNetwork graph={g} />)} </Grid>
+}
+
+
+export default function LayerTabs(layers) {
+  const [value, setValue] = React.useState('1');
+
+  const handleChange = (event, newValue) => {
+    setValue(newValue);
+  };
+
+  return (
+    <Box sx={{ width: '100%', typography: 'body1' }}>
+      <TabContext value={value}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <TabList onChange={handleChange} aria-label="lab API tabs example">
+            {layers.layers.map((layer,i) => <Tab label={"Layer " + i} value={i} />)}
+          </TabList>
+        </Box>
+          {layers.layers.map((layer,i) => <TabPanel value={i}><LayerComponent layer={layer} /></TabPanel>)}
+      </TabContext>
+    </Box>
+  );
 }
 
 
@@ -52,9 +78,7 @@ export class SmilesForm extends React.Component {
             <input type="submit" value="Submit" />
           </form>
           <Example data={this.state.attention_fig} />
-          <Grid>
-          {this.state.graphs.map((layer) => <LayerComponent layer={layer} />)}
-          </Grid>
+          <LayerTabs layers={this.state.graphs}/>
       </div>
     );
   }
