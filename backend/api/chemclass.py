@@ -11,6 +11,8 @@ import numpy as np
 import sys
 from app import app
 import matplotlib as mpl
+import json
+import networkx as nx
 
 mpl.use("TkAgg")
 
@@ -29,6 +31,16 @@ model_kwargs = dict(
 
 electra_model = Electra(**model_kwargs)
 
+PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open("/home/glauer/dev/ChEBI_RvNN/data/ChEBI100/raw/classes.txt")]
+
+def load_sub_ontology():
+    d = json.load(open("/data/ontologies/chebi100.json"))
+    g = nx.DiGraph()
+    g.add_nodes_from([(c["ID"], dict(lbl=c["LABEL"][0])) for c in d])
+    g.add_edges_from([(t, c["ID"]) for c in d for t in c.get("SubClasses",[])])
+    return g
+
+CHEBI_FRAGMENT = load_sub_ontology()
 
 class PredictionApiHandler(Resource):
     def load_image(self, path):
@@ -67,6 +79,22 @@ class PredictionApiHandler(Resource):
             ],
         )
 
+    def get_relevant_chebi_fragment(self, predictions):
+        new_node = "your class"
+        fragment_graph = CHEBI_FRAGMENT.copy()
+        fragment_graph.add_edges_from([(new_node, h) for h,p in zip(PREDICTION_HEADERS, predictions) if p>0.5])
+        fragment_graph.nodes[new_node]["lbl"] = new_node
+        sub = nx.transitive_reduction(fragment_graph.subgraph(nx.shortest_path(fragment_graph, new_node)))
+        #Copy node data to subgraph
+        sub.add_nodes_from(d for d in fragment_graph.nodes(data=True) if d[0] in sub.nodes)
+        return sub
+
+    def nx_to_graph(self, g: nx.Graph):
+        return dict(
+            nodes=[dict(id=n, label=g.nodes[n]["lbl"]) for n in g.nodes],
+            edges=[{"from":a, "to":b, "arrows":dict(to=True)} for (a,b) in g.edges]
+        )
+
     def post(self):
         parser = reqparse.RequestParser()
         plotter = AttentionMolPlot()
@@ -103,6 +131,8 @@ class PredictionApiHandler(Resource):
             for a in result["attentions"]
         ]
 
+        chebi = self.get_relevant_chebi_fragment(result["logits"][0].tolist())
+
         atts = np.concatenate([a.detach().numpy() for a in result["attentions"]])
 
         with NamedTemporaryFile(mode="wt", suffix=".png") as svg1:
@@ -113,7 +143,7 @@ class PredictionApiHandler(Resource):
             mol_pic = self.load_image(svg1.name)
 
         return {
-            "logits": result["logits"].tolist(),
             "figures": {"attention_mol": mol_pic},
             "graphs": graphs,
+            "classification": self.nx_to_graph(chebi)
         }

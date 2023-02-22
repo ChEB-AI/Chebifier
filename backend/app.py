@@ -18,3 +18,4 @@ def serve(path):
 
 from api.chemclass import PredictionApiHandler
 api.add_resource(PredictionApiHandler, '/api/classify')
+#api.add_resource(ChEBI100ApiHandler, '/api/chebi100')
