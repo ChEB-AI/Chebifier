@@ -11,6 +11,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FormControl from '@mui/material/FormControl';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
@@ -38,21 +39,8 @@ const VisNetwork = (data) => {
     </Box>;
 };
 
-const LayerComponent = (layer) => {
-    const Item = styled(Paper)(({theme}) => ({
-        backgroundColor: theme.palette.mode === 'dark' ? '#1A2027' : '#fff',
-        ...theme.typography.body2,
-        padding: theme.spacing(1),
-        textAlign: 'center',
-        color: theme.palette.text.secondary,
-    }));
-
-    return <Stack> {layer.layer.map((g) => <Item><VisNetwork graph={g} physics={false} layout={{}}/></Item>)} </Stack>
-}
-
-
-export default function LayerTabs(layers) {
-    const [value, setValue] = React.useState('1');
+const LayerComponent = (data) => {
+    const [value, setValue] = React.useState(0);
 
     const handleChange = (event, newValue) => {
         setValue(newValue);
@@ -63,7 +51,29 @@ export default function LayerTabs(layers) {
             <TabContext value={value}>
                 <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
                     <TabList onChange={handleChange} aria-label="lab API tabs example">
-                        {layers.layers.map((layer, i) => <Tab label={"Layer " + i} value={i}/>)}
+                        {data.layer.map((layer, i) => <Tab label={"Head " + (i + 1) } value={i}/>)}
+                    </TabList>
+                </Box>
+                {data.layer.map((g, i) => <TabPanel value={i}><VisNetwork graph={g} physics={false} layout={{}}/></TabPanel>)}
+            </TabContext>
+        </Box>
+    );
+}
+
+
+export default function LayerTabs(layers) {
+    const [value, setValue] = React.useState(0);
+
+    const handleChange = (event, newValue) => {
+        setValue(newValue);
+    };
+
+    return (
+        <Box sx={{width: '100%', typography: 'body1'}}>
+            <TabContext value={value}>
+                <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
+                    <TabList onChange={handleChange} aria-label="lab API tabs example">
+                        {layers.layers.map((layer, i) => <Tab label={"Layer " + (i + 1)} value={i} centered/>)}
                     </TabList>
                 </Box>
                 {layers.layers.map((layer, i) => <TabPanel value={i}><LayerComponent layer={layer}/></TabPanel>)}
@@ -112,24 +122,25 @@ export class SmilesForm extends React.Component {
         return (
             <Box width={'100%'}>
                 <Grid container spacing={2}>
-                    <Grid item xs={8}>
+                    <Grid item xs={8} zeroMinWidth>
                         <Item>
                             <Box>
-                                <Box>
-                                    <h1>ChEBIfier</h1>
-                                    Use artifical intelligence to classify a molecular structure in ChEBI.
-                                </Box>
-                                <Box component="form"
-                                     sx={{
-                                         '& > :not(style)': {m: 1, width: '25ch'},
-                                     }}
+                                <h1>ChEBIfier</h1>
+                                Use artifical intelligence to classify a molecular structure in ChEBI.
+                            </Box>
+                            <Box>
+                                <Grid container
+                                    component="form"
                                      noValidate
-                                     onSubmit={this.handleSubmit}>
+                                     onSubmit={this.handleSubmit}
+                                 spacing={2}>
+                                    <Grid item xs={10} zeroMinWidth>
+                                    <FormControl fullWidth variant="standard">
                                     <TextField defaultValue={this.state.value} onChange={this.handleChange}
                                                label="Your SMILES string"
-                                               variant="outlined"/>
-                                    <Button variant="outlined" type="submit">Classify</Button>
-                                </Box>
+                                               variant="outlined"/></FormControl></Grid>
+                                    <Grid item xs={2} zeroMinWidth ><FormControl><Button  variant="outlined" type="submit">Classify</Button></FormControl></Grid>
+                                </Grid>
                             </Box>
                         </Item>
                     </Grid>
@@ -187,7 +198,9 @@ export class SmilesForm extends React.Component {
                                     counterpart. The parts of the molecule that the system is paying attention to, are
                                     indicated by lines. Darker shades indicate stronger attention.</Typography>
                                 </Paper>
-                                <LayerTabs layers={this.state.graphs}/>
+                                <Box  sx={{height:"400px"}}>
+                                    <LayerTabs layers={this.state.graphs}/>
+                                </Box>
                         </AccordionDetails>
                     </Accordion>
                 </Box>
