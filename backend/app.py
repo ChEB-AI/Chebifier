@@ -16,6 +16,6 @@ api = Api(app)
 def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
 
-from api.chemclass import PredictionApiHandler
-api.add_resource(PredictionApiHandler, '/api/classify')
-#api.add_resource(ChEBI100ApiHandler, '/api/chebi100')
+from api.chemclass import PredictionDetailApiHandler, BatchPrediction
+api.add_resource(PredictionDetailApiHandler, '/api/details')
+api.add_resource(BatchPrediction, '/api/classify')

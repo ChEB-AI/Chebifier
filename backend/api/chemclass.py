@@ -30,6 +30,7 @@ model_kwargs = dict(
 )
 
 electra_model = Electra(**model_kwargs)
+electra_model.eval()
 
 PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open("/home/glauer/dev/ChEBI_RvNN/data/ChEBI100/raw/classes.txt")]
 
@@ -42,7 +43,47 @@ def load_sub_ontology():
 
 CHEBI_FRAGMENT = load_sub_ontology()
 
-class PredictionApiHandler(Resource):
+
+def get_relevant_chebi_fragment(predictions, smiles, labels=None):
+    fragment_graph = CHEBI_FRAGMENT.copy()
+    predicted_subsumtions = [(i, h) for i in range(predictions.shape[0]) for h, p in zip(PREDICTION_HEADERS, predictions[i].tolist()) if p >= 0]
+    fragment_graph.add_edges_from(predicted_subsumtions)
+    necessary_nodes = set()
+    for i in range(predictions.shape[0]):
+        fragment_graph.nodes[i]["lbl"] = labels[i] if labels else smiles[i]
+        necessary_nodes = necessary_nodes.union(set(nx.shortest_path(fragment_graph, i)))
+    sub = nx.transitive_reduction(fragment_graph.subgraph(necessary_nodes))
+
+    # Copy node data to subgraph
+    sub.add_nodes_from(d for d in fragment_graph.nodes(data=True) if d[0] in sub.nodes)
+    return sub, dict(predicted_subsumtions)
+
+def nx_to_graph(g: nx.Graph):
+    return dict(
+        nodes=[dict(id=n, label=g.nodes[n]["lbl"]) for n in g.nodes],
+        edges=[{"from":a, "to":b, "arrows":dict(to=True)} for (a,b) in g.edges]
+    )
+
+
+class BatchPrediction(Resource):
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument("smiles", type=str, action="append")
+        args = parser.parse_args()
+        smiles = args["smiles"]
+
+        reader = ChemDataReader()
+        collater = RaggedCollater()
+        token_dict = [reader.to_data(dict(features=s, labels=None)) for s in smiles]
+        tokenised_input = electra_model._get_data_and_labels(collater(token_dict), 0)
+        result = electra_model(tokenised_input)
+
+        chebi, predicted_parents = get_relevant_chebi_fragment(result["logits"], smiles)
+
+        return {"predicted_parents": [predicted_parents[i] for i in range(len(smiles))], "chebi": nx_to_graph(chebi), "direct_parents": [list(chebi.successors(i)) for i in range(len(smiles))]}
+
+
+class PredictionDetailApiHandler(Resource):
     def load_image(self, path):
         im = Image.open(path)
         data = io.BytesIO()
@@ -79,21 +120,9 @@ class PredictionApiHandler(Resource):
             ],
         )
 
-    def get_relevant_chebi_fragment(self, predictions):
-        new_node = "your class"
-        fragment_graph = CHEBI_FRAGMENT.copy()
-        fragment_graph.add_edges_from([(new_node, h) for h,p in zip(PREDICTION_HEADERS, predictions) if p>0.5])
-        fragment_graph.nodes[new_node]["lbl"] = new_node
-        sub = nx.transitive_reduction(fragment_graph.subgraph(nx.shortest_path(fragment_graph, new_node)))
-        #Copy node data to subgraph
-        sub.add_nodes_from(d for d in fragment_graph.nodes(data=True) if d[0] in sub.nodes)
-        return sub
 
-    def nx_to_graph(self, g: nx.Graph):
-        return dict(
-            nodes=[dict(id=n, label=g.nodes[n]["lbl"]) for n in g.nodes],
-            edges=[{"from":a, "to":b, "arrows":dict(to=True)} for (a,b) in g.edges]
-        )
+
+
 
     def post(self):
         parser = reqparse.RequestParser()
@@ -131,7 +160,7 @@ class PredictionApiHandler(Resource):
             for a in result["attentions"]
         ]
 
-        chebi = self.get_relevant_chebi_fragment(result["logits"][0].tolist())
+        _, chebi = get_relevant_chebi_fragment(result["logits"])
 
         atts = np.concatenate([a.detach().numpy() for a in result["attentions"]])
 
@@ -145,5 +174,5 @@ class PredictionApiHandler(Resource):
         return {
             "figures": {"attention_mol": mol_pic},
             "graphs": graphs,
-            "classification": self.nx_to_graph(chebi)
+            "classification": nx_to_graph(chebi)
         }

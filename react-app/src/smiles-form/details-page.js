@@ -90,9 +90,9 @@ const Item = styled(Paper)(({theme}) => ({
     color: theme.palette.text.secondary,
 }));
 
-const Molecule = ({data}) => <img src={`data:image/jpeg;base64,${data}`} hidden={(data === null)} width="200" height="200"/>;
+const Molecule = ({data}) => <img src={`data:image/jpeg;base64,${data}`} hidden={(data === null)} width="400" height="400"/>;
 
-export class SmilesForm extends React.Component {
+export class DetailsPage extends React.Component {
     constructor(props) {
         super(props);
         this.state = {value: '', attention_fig: '', graphs: [], chebi: null};
@@ -106,7 +106,7 @@ export class SmilesForm extends React.Component {
 
     handleSubmit(event) {
         event.preventDefault();
-        axios.post('/api/classify', {smiles: this.state.value}).then(response => {
+        axios.post('/api/details', {smiles: this.state.value}).then(response => {
             this.setState({
                 attention_fig: response.data.figures.attention_mol,
                 graphs: response.data.graphs,
@@ -121,35 +121,6 @@ export class SmilesForm extends React.Component {
 
         return (
             <Box width={'100%'}>
-                <Grid container spacing={2}>
-                    <Grid item xs={8} zeroMinWidth>
-                        <Item>
-                            <Box>
-                                <h1>ChEBIfier</h1>
-                                Use artifical intelligence to classify a molecular structure in ChEBI.
-                            </Box>
-                            <Box>
-                                <Grid container
-                                    component="form"
-                                     noValidate
-                                     onSubmit={this.handleSubmit}
-                                 spacing={2}>
-                                    <Grid item xs={10} zeroMinWidth>
-                                    <FormControl fullWidth variant="standard">
-                                    <TextField defaultValue={this.state.value} onChange={this.handleChange}
-                                               label="Your SMILES string"
-                                               variant="outlined"/></FormControl></Grid>
-                                    <Grid item xs={2} zeroMinWidth ><FormControl><Button  variant="outlined" type="submit">Classify</Button></FormControl></Grid>
-                                </Grid>
-                            </Box>
-                        </Item>
-                    </Grid>
-                    <Grid item xs={4}>
-                        <Box sx={{ display: (this.state.chebi === null ?'none':'inline') }}>
-                            <Item><Molecule data={this.state.attention_fig}/></Item>
-                        </Box>
-                    </Grid>
-                </Grid>
                 <Box sx={{ display: (this.state.chebi === null ?'none':'inline') }}>
                     <Accordion>
                         <AccordionSummary
@@ -208,3 +179,4 @@ export class SmilesForm extends React.Component {
         );
     }
 }
+
