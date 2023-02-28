@@ -1,83 +1,38 @@
 import * as React from 'react';
-import axios from "axios";
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
-import FileUploadIcon from '@mui/icons-material/FileUpload';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
-import StartIcon from '@mui/icons-material/Start';
 import {
   GridRowModes,
   DataGrid,
   GridToolbarContainer,
   GridActionsCellItem,
-} from '@mui/x-data-grid';
+} from '@mui/x-data-grid-pro';
 import {
   randomId,
 } from '@mui/x-data-grid-generator';
 
 function EditToolbar(props) {
-  const { setRows, setRowModesModel, rows } = props;
+  const { setRows, setRowModesModel } = props;
 
-  const addRows = ((smiles) => {
-        const ids = smiles.map((s) => randomId());
-        setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id:ids[i], smiles: s, parents: []}))]);
-        return ids
-      }
-  )
-
-  const handleAdd = () => {
-    const ids = addRows([''])
+  const handleClick = () => {
+    const id = randomId();
+    setRows((oldRows) => [...oldRows, { id, name: '', age: '', isNew: true }]);
     setRowModesModel((oldModel) => ({
-          ...oldModel,
-          ...Object.fromEntries(ids.map(id => [id, {mode: GridRowModes.Edit, fieldToFocus: 'smiles'}])),
-        }));
-  };
-
-  const handleUpload = (event) => {
-    event.preventDefault();
-    console.log(event);
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      addRows(e.target.result.split("\n"))
-    };
-    reader.readAsText(event.target.files[0])
-  };
-
-  const handleRun = () => {
-    axios({
-        url: '/api/classify',
-        method: 'post',
-        data: {smiles: rows.map((r) => (r["smiles"]))}
-    }).then(response => {
-        setRows((oldRows) => oldRows.map((row, i) => ({
-          ...row, "direct_parents":response.data.direct_parents[i]})));
-    });
+      ...oldModel,
+      [id]: { mode: GridRowModes.Edit, fieldToFocus: 'name' },
+    }));
   };
 
   return (
     <GridToolbarContainer>
-      <Button color="primary" startIcon={<AddIcon />} onClick={handleAdd}>
-        Add SMILES
-      </Button>
-          <Button color="primary" startIcon={<FileUploadIcon />} component="label" >
-              Upload file
-              <input
-          accept="text/plain"
-          style={{display: 'none'}}
-          id="file-upload"
-          type="file"
-          onChange={handleUpload}
-      />
-          </Button>
-
-      <Button color="primary" startIcon={<StartIcon />} onClick={handleRun}>
-        Predict classes
+      <Button color="primary" startIcon={<AddIcon />} onClick={handleClick}>
+        Add record
       </Button>
     </GridToolbarContainer>
   );
@@ -88,8 +43,8 @@ EditToolbar.propTypes = {
   setRows: PropTypes.func.isRequired,
 };
 
-export default function ClassificationGrid() {
-  const [rows, setRows] = React.useState([]);
+export default function FullFeaturedCrudGrid(data) {
+  const [rows, setRows] = React.useState({});
   const [rowModesModel, setRowModesModel] = React.useState({});
 
   const handleRowEditStart = (params, event) => {
@@ -131,13 +86,13 @@ export default function ClassificationGrid() {
   };
 
   const columns = [
-    { field: 'smiles', headerName: 'Smiles', flex: 0.45, editable: true },
-    { field: 'direct_parents', headerName: 'Predicted Class', flex: 0.45, editable: false },
+    { field: 'smiles', headerName: 'Name', width: 180, editable: true },
+    { field: 'predicted parents', headerName: 'Age', type: 'number', editable: false },
     {
       field: 'actions',
       type: 'actions',
       headerName: 'Actions',
-      flex: 0.1,
+      width: 100,
       cellClassName: 'actions',
       getActions: ({ id }) => {
         const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
@@ -179,7 +134,6 @@ export default function ClassificationGrid() {
   ];
 
   return (
-      <Paper sx={{width: "100%"}}>
     <Box
       sx={{
         height: 500,
@@ -205,11 +159,10 @@ export default function ClassificationGrid() {
           Toolbar: EditToolbar,
         }}
         componentsProps={{
-          toolbar: { setRows, setRowModesModel, rows },
+          toolbar: { setRows, setRowModesModel },
         }}
         experimentalFeatures={{ newEditingApi: true }}
       />
     </Box>
-        </Paper>
   );
 }
