@@ -29,13 +29,15 @@ model_kwargs = dict(
     ),
 )
 
+BATCH_SIZE = app.config.get("BATCH_SIZE", 100)
+
 electra_model = Electra(**model_kwargs)
 electra_model.eval()
 
-PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open("/home/glauer/dev/ChEBI_RvNN/data/ChEBI100/raw/classes.txt")]
+PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
 
 def load_sub_ontology():
-    d = json.load(open("/data/ontologies/chebi100.json"))
+    d = json.load(open(app.config["CHEBI_JSON"]))
     g = nx.DiGraph()
     g.add_nodes_from([(c["ID"], dict(lbl=c["LABEL"][0])) for c in d])
     g.add_edges_from([(t, c["ID"]) for c in d for t in c.get("SubClasses",[])])
@@ -58,6 +60,7 @@ def get_relevant_chebi_fragment(predictions, smiles, labels=None):
     sub.add_nodes_from(d for d in fragment_graph.nodes(data=True) if d[0] in sub.nodes)
     return sub, dict(predicted_subsumtions)
 
+
 def nx_to_graph(g: nx.Graph):
     return dict(
         nodes=[dict(id=n, label=g.nodes[n]["lbl"]) for n in g.nodes],
@@ -65,8 +68,37 @@ def nx_to_graph(g: nx.Graph):
     )
 
 
+def batchify(l):
+    cache = []
+    for r in l:
+        cache.append(r)
+        if len(cache) >= BATCH_SIZE:
+            yield cache
+            cache = []
+    if cache:
+        yield cache
+
+
 class BatchPrediction(Resource):
+
+
+
     def post(self):
+        """
+        Accepts a dictionary with the following structure
+        {
+            "smiles": [ ... list of smiles strings]
+        }
+        :return:
+        A dictionary wit hthe following structure
+        {
+            "predicted_parents": [ ... [... parent classes as predicted by the system] or None for each smiles ],
+            "direct_parents": [ ... [... lowest possible predicted parents] or None for each smiles ] or None
+        }
+
+        If the system us unable to parse any smiles string, the respective entry in each list will be `None`
+        """
+
         parser = reqparse.RequestParser()
         parser.add_argument("smiles", type=str, action="append")
         args = parser.parse_args()
@@ -74,13 +106,31 @@ class BatchPrediction(Resource):
 
         reader = ChemDataReader()
         collater = RaggedCollater()
-        token_dict = [reader.to_data(dict(features=s, labels=None)) for s in smiles]
-        tokenised_input = electra_model._get_data_and_labels(collater(token_dict), 0)
-        result = electra_model(tokenised_input)
+        token_dicts = []
+        could_not_parse = []
+        index_map = dict()
+        for i, s in enumerate(smiles):
+            try:
+                # Try to parse the smiles string
+                d = reader.to_data(dict(features=s, labels=None))
+            except:
+                # Note if it fails
+                could_not_parse.append(i)
+            else:
+                index_map[i] = len(token_dicts)
+                token_dicts.append(d)
+        results = []
+        for batch in batchify(token_dicts):
+            dat = electra_model._get_data_and_labels(collater(batch), 0)
+            result = electra_model(dat)
+            results += result["logits"].cpu().detach().tolist()
 
-        chebi, predicted_parents = get_relevant_chebi_fragment(result["logits"], smiles)
+        chebi, predicted_parents = get_relevant_chebi_fragment(np.stack(results, axis=0), smiles)
 
-        return {"predicted_parents": [predicted_parents[i] for i in range(len(smiles))], "chebi": nx_to_graph(chebi), "direct_parents": [list(chebi.successors(i)) for i in range(len(smiles))]}
+        return {
+            "predicted_parents": [(None if i in could_not_parse else predicted_parents[index_map[i]]) for i in range(len(smiles))],
+            "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))]
+        }
 
 
 class PredictionDetailApiHandler(Resource):
