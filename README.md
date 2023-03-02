@@ -12,7 +12,7 @@ After that, you can install the prediction system and web framework:
 
 *Chebifier* comes with a number of mandatory configuration files. `config.template.json` contains a template for a *Chebifier* configuration. Copy the contents of this file 
 
-`cp config.template.json config.json`
+`cp backend/config.template.json backend/config.json`
 
 and change the path for each setting according to your setup.
 
@@ -34,6 +34,9 @@ and follow the build the [node.js-instructions](react-app/README.md)
 
 You can now start the development server with 
 
-`flask run`
+```
+cd backend
+flask run
+```
 
 The server should now run at [localhost:5000](localhost:5000)
