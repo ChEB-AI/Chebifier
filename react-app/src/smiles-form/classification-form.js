@@ -57,7 +57,7 @@ function EditToolbar(props) {
 
     const handleDownload = (event) => {
         event.preventDefault();
-        const fileData = JSON.stringify(rows.filter((d) => d["direct_parents"].length !== 0));
+        const fileData = JSON.stringify(rows.map((r) => ({"smiles": r["smiles"], "direct_parents": r["direct_parents"],"predicted_parents": r["predicted_parents"],})).filter((d) => d["direct_parents"].length !== 0));
         const blob = new Blob([fileData], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
