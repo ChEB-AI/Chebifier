@@ -217,6 +217,7 @@ export default function ClassificationGrid() {
                         label="Details"
                         onClick={handleOpen(id)}
                         color="inherit"
+                        disabled={!wasPredicted}
                     />,
                 ];
             },
