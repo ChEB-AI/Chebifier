@@ -25,10 +25,11 @@ and change the path for each setting according to your setup.
 
 ## Setup Frontend
 
-Change to the respective directory
-`cd react-app`
-
-and follow the build the [node.js-instructions](react-app/README.md)
+Change to the respective directory and build the node.js files
+```
+cd react-app
+npm run build
+```
 
 ## Run in development
 
