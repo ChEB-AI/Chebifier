@@ -7,11 +7,15 @@ import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
 import StartIcon from '@mui/icons-material/Start';
+import Modal from '@mui/material/Modal';
 import {
     GridRowModes,
     DataGrid,
@@ -21,13 +25,14 @@ import {
 import {
     randomId,
 } from '@mui/x-data-grid-generator';
+import DetailsPage from "./details-page";
 
 function EditToolbar(props) {
     const {setRows, setRowModesModel, rows} = props;
 
     const addRows = ((smiles) => {
             const ids = smiles.map((s) => randomId());
-            setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id: ids[i], smiles: s, parents: []}))]);
+            setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id: ids[i], smiles: s, direct_parents: [], predicted_parents: []}))]);
             return ids
         }
     )
@@ -50,6 +55,17 @@ function EditToolbar(props) {
         reader.readAsText(event.target.files[0])
     };
 
+    const handleDownload = (event) => {
+        event.preventDefault();
+        const fileData = JSON.stringify(rows.filter((d) => d["direct_parents"].length !== 0));
+        const blob = new Blob([fileData], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = "chebifier-predictions.json";
+        link.href = url;
+        link.click();
+    };
+
     const handleRun = () => {
         axios({
             url: '/api/classify',
@@ -57,7 +73,7 @@ function EditToolbar(props) {
             data: {smiles: rows.map((r) => (r["smiles"]))}
         }).then(response => {
             setRows((oldRows) => oldRows.map((row, i) => ({
-                ...row, "direct_parents": response.data.direct_parents[i]
+                ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i],
             })));
         });
     };
@@ -81,6 +97,9 @@ function EditToolbar(props) {
             <Button color="primary" startIcon={<StartIcon/>} onClick={handleRun}>
                 Predict classes
             </Button>
+            <Button color="primary" startIcon={<FileDownloadIcon/>} onClick={handleDownload} disabled={rows.filter((d) => d["direct_parents"].length !== 0).length === 0}>
+                Download JSON
+            </Button>
         </GridToolbarContainer>
     );
 }
@@ -93,6 +112,7 @@ EditToolbar.propTypes = {
 export default function ClassificationGrid() {
     const [rows, setRows] = React.useState([]);
     const [rowModesModel, setRowModesModel] = React.useState({});
+    const [detail, setDetail] = React.useState(null);
 
     const handleRowEditStart = (params, event) => {
         event.defaultMuiPrevented = true;
@@ -132,6 +152,21 @@ export default function ClassificationGrid() {
         return updatedRow;
     };
 
+    const [open, setOpen] = React.useState(false);
+    const handleOpen = (id) => () => {
+        const thisRow = rows.find((row) => row.id === id);
+        axios.post('/api/details', {smiles: thisRow.smiles}).then(response => {
+            setDetail({
+                attention_fig: response.data.figures.attention_mol,
+                graphs: response.data.graphs,
+                chebi: response.data.classification
+            });
+            setOpen(true);
+        });
+
+    }
+    const handleClose = () => setOpen(false);
+
     const columns = [
         {field: 'smiles', headerName: 'Smiles', flex: 0.45, editable: true},
         {field: 'direct_parents', headerName: 'Predicted Class', flex: 0.45, editable: false},
@@ -143,6 +178,8 @@ export default function ClassificationGrid() {
             cellClassName: 'actions',
             getActions: ({id}) => {
                 const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
+                const thisRow = rows.find((row) => row.id === id);
+                const wasPredicted = thisRow.direct_parents.length > 0;
 
                 if (isInEditMode) {
                     return [
@@ -173,6 +210,12 @@ export default function ClassificationGrid() {
                         icon={<DeleteIcon/>}
                         label="Delete"
                         onClick={handleDeleteClick(id)}
+                        color="inherit"
+                    />,
+                    <GridActionsCellItem
+                        icon={<LightbulbIcon/>}
+                        label="Details"
+                        onClick={handleOpen(id)}
                         color="inherit"
                     />,
                 ];
@@ -218,6 +261,19 @@ export default function ClassificationGrid() {
                     />
                 </Box>
             </Paper>
+
+            <Modal
+              open={open}
+              onClose={handleClose}
+              aria-labelledby="modal-modal-title"
+              aria-describedby="modal-modal-description"
+            >
+                <Box>
+                <Button color="primary" onClick={handleClose} startIcon={<CancelIcon/>}/>
+                <DetailsPage detail={detail} />
+                    </Box>
+            </Modal>
+
         </Box>
     );
 }

@@ -1,4 +1,7 @@
 {
     "TESTING":true,
-    "ELECTRA_CHECKPOINT":"path-to-checkpoint"
+    "ELECTRA_CHECKPOINT":"path-to-checkpoint",
+    "BATCH_SIZE": 10,
+    "CLASS_HEADERS": "path-to-classes.txt",
+    "CHEBI_JSON": "path-to-chebi100.json"
 }

@@ -210,7 +210,7 @@ class PredictionDetailApiHandler(Resource):
             for a in result["attentions"]
         ]
 
-        _, chebi = get_relevant_chebi_fragment(result["logits"])
+        chebi, predicted_parents = get_relevant_chebi_fragment(result["logits"].detach().numpy(), [smiles])
 
         atts = np.concatenate([a.detach().numpy() for a in result["attentions"]])
 
