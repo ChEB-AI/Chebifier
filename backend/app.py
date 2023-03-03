@@ -7,15 +7,18 @@ import json
 app = Flask(__name__, static_url_path='', static_folder='../react-app/build')
 CORS(app) # comment this on deployment
 
-app.config.from_file("config.default.json", load=json.load)
+app.config.from_file("config.template.json", load=json.load)
 app.config.from_file("config.json", load=json.load)
 
 api = Api(app)
+
 
 @app.route("/", defaults={'path': ''})
 def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
 
+
 from api.chemclass import PredictionDetailApiHandler, BatchPrediction
 api.add_resource(PredictionDetailApiHandler, '/api/details')
 api.add_resource(BatchPrediction, '/api/classify')
+api.add_resource(BatchPrediction, '/api/hierarchy')
