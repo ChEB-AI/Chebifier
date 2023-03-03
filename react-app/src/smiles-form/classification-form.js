@@ -1,13 +1,16 @@
 import * as React from 'react';
+import { useEffect } from 'react';
 import axios from "axios";
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
+import Chip from '@mui/material/Chip';
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -27,8 +30,48 @@ import {
 } from '@mui/x-data-grid-generator';
 import DetailsPage from "./details-page";
 
+const RenderDate = (props) => {
+  const { hasFocus, value } = props;
+  const buttonElement = React.useRef(null);
+  const rippleRef = React.useRef(null);
+
+  React.useLayoutEffect(() => {
+    if (hasFocus) {
+      const input = buttonElement.current?.querySelector('input');
+      input?.focus();
+    } else if (rippleRef.current) {
+      // Only available in @mui/material v5.4.1 or later
+      rippleRef.current.stop({});
+    }
+  }, [hasFocus]);
+
+  return (
+    <strong>
+      {value?.getFullYear() ?? ''}
+      <Button
+        component="button"
+        ref={buttonElement}
+        touchRippleRef={rippleRef}
+        variant="contained"
+        size="small"
+        style={{ marginLeft: 16 }}
+        // Remove button from tab sequence when cell does not have focus
+        tabIndex={hasFocus ? 0 : -1}
+        onKeyDown={(event) => {
+          if (event.key === ' ') {
+            // Prevent key navigation when focus is on button
+            event.stopPropagation();
+          }
+        }}
+      >
+        Open
+      </Button>
+    </strong>
+  );
+};
+
 function EditToolbar(props) {
-    const {setRows, setRowModesModel, rows} = props;
+    const {setRows, setRowModesModel, rows, getLabel} = props;
 
     const addRows = ((smiles) => {
             const ids = smiles.map((s) => randomId());
@@ -47,7 +90,6 @@ function EditToolbar(props) {
 
     const handleUpload = (event) => {
         event.preventDefault();
-        console.log(event);
         const reader = new FileReader()
         reader.onload = async (e) => {
             addRows(e.target.result.split("\n"))
@@ -67,6 +109,7 @@ function EditToolbar(props) {
     };
 
     const handleRun = () => {
+        console.log(rows);
         axios({
             url: '/api/classify',
             method: 'post',
@@ -113,6 +156,14 @@ export default function ClassificationGrid() {
     const [rows, setRows] = React.useState([]);
     const [rowModesModel, setRowModesModel] = React.useState({});
     const [detail, setDetail] = React.useState(null);
+    const [hierarchy, setHierarchy] = React.useState({});
+
+    if (Object.keys(hierarchy).length === 0) {
+        axios.get('/api/hierarchy').then(response => {
+            setHierarchy(response.data);
+        });
+    }
+
 
     const handleRowEditStart = (params, event) => {
         event.defaultMuiPrevented = true;
@@ -152,6 +203,17 @@ export default function ClassificationGrid() {
         return updatedRow;
     };
 
+    const renderClasses = (params) => {
+        const data = params.value;
+        if (data == null){
+          return  <Typography>Could not process input</Typography>
+        } else {
+            return <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+                {(data.map((x) => <Chip component="a" href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")} label={hierarchy[x].label} clickable target="_blank"/>))}
+                </Box>
+        }
+    };
+
     const [open, setOpen] = React.useState(false);
     const handleOpen = (id) => () => {
         const thisRow = rows.find((row) => row.id === id);
@@ -169,7 +231,7 @@ export default function ClassificationGrid() {
 
     const columns = [
         {field: 'smiles', headerName: 'Smiles', flex: 0.45, editable: true},
-        {field: 'direct_parents', headerName: 'Predicted Class', flex: 0.45, editable: false},
+        {field: 'direct_parents', headerName: 'Predicted Class', flex: 0.45, editable: false, renderCell:renderClasses},
         {
             field: 'actions',
             type: 'actions',
@@ -224,6 +286,10 @@ export default function ClassificationGrid() {
         },
     ];
 
+    const getLabel = (x) => {
+        return hierarchy[x]["label"]
+    }
+
     return (
         <Box sx={{width: "100%"}}>
             <Box>
@@ -252,11 +318,12 @@ export default function ClassificationGrid() {
                         onRowEditStart={handleRowEditStart}
                         onRowEditStop={handleRowEditStop}
                         processRowUpdate={processRowUpdate}
+                        getRowHeight={() => 'auto'}
                         components={{
                             Toolbar: EditToolbar,
                         }}
                         componentsProps={{
-                            toolbar: {setRows, setRowModesModel, rows},
+                            toolbar: {setRows, setRowModesModel, rows, getLabel},
                         }}
                         experimentalFeatures={{newEditingApi: true}}
                     />

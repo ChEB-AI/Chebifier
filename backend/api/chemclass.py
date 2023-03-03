@@ -35,12 +35,12 @@ electra_model = Electra(**model_kwargs)
 electra_model.eval()
 
 PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
+LABEL_HIERARCHY = json.load(open(app.config["CHEBI_JSON"]))
 
 def load_sub_ontology():
-    d = json.load(open(app.config["CHEBI_JSON"]))
     g = nx.DiGraph()
-    g.add_nodes_from([(c["ID"], dict(lbl=c["LABEL"][0])) for c in d])
-    g.add_edges_from([(t, c["ID"]) for c in d for t in c.get("SubClasses",[])])
+    g.add_nodes_from([(c["ID"], dict(lbl=c["LABEL"][0])) for c in LABEL_HIERARCHY])
+    g.add_edges_from([(t, c["ID"]) for c in LABEL_HIERARCHY for t in c.get("SubClasses",[])])
     return g
 
 CHEBI_FRAGMENT = load_sub_ontology()
@@ -58,7 +58,8 @@ def get_relevant_chebi_fragment(predictions, smiles, labels=None):
 
     # Copy node data to subgraph
     sub.add_nodes_from(d for d in fragment_graph.nodes(data=True) if d[0] in sub.nodes)
-    return sub, dict(predicted_subsumtions)
+    keys = set(i for i,_ in predicted_subsumtions)
+    return sub, {k: [l for j,l in predicted_subsumtions if j == k] for k in keys}
 
 
 def nx_to_graph(g: nx.Graph):
@@ -77,6 +78,11 @@ def batchify(l):
             cache = []
     if cache:
         yield cache
+
+
+class HierarchyAPI(Resource):
+    def get(self):
+        return {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses",[])) for r in LABEL_HIERARCHY}
 
 
 class BatchPrediction(Resource):
@@ -122,7 +128,7 @@ class BatchPrediction(Resource):
         results = []
         for batch in batchify(token_dicts):
             dat = electra_model._get_data_and_labels(collater(batch), 0)
-            result = electra_model(dat)
+            result = electra_model(dat, **dat["model_kwargs"])
             results += result["logits"].cpu().detach().tolist()
 
         chebi, predicted_parents = get_relevant_chebi_fragment(np.stack(results, axis=0), smiles)
