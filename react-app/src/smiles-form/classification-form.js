@@ -336,10 +336,17 @@ export default function ClassificationGrid() {
               aria-labelledby="modal-modal-title"
               aria-describedby="modal-modal-description"
             >
-                <Box>
-                <Button color="primary" onClick={handleClose} startIcon={<CancelIcon/>}/>
-                <DetailsPage detail={detail} />
-                    </Box>
+                <Box sx={{
+                  mb: 2,
+                  display: "flex",
+                  flexDirection: "column",
+                  height: 700,
+                  overflow: "hidden",
+                  overflowY: "scroll",
+                }}>
+                    <Button color="primary" onClick={handleClose} startIcon={<CancelIcon/>}/>
+                    <DetailsPage detail={detail} />
+                </Box>
             </Modal>
 
         </Box>
