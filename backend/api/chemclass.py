@@ -198,7 +198,7 @@ class PredictionDetailApiHandler(Resource):
         reader = ChemDataReader()
         collater = RaggedCollater()
         token_dict = reader.to_data(dict(features=smiles, labels=None))
-        tokens = token_dict["features"]
+        tokens = np.array(token_dict["features"]).astype(int).tolist()
         tokenised_input = electra_model._get_data_and_labels(collater([token_dict]), 0)
         result = electra_model(tokenised_input)
 
