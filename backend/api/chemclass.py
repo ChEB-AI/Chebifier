@@ -196,7 +196,6 @@ class PredictionDetailApiHandler(Resource):
 
         args = parser.parse_args()
 
-        print(args)
         # note, the post req from frontend needs to match the strings here (e.g. 'type and 'message')
 
         request_type = args["type"]

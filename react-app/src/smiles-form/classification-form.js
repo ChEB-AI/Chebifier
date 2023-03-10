@@ -109,7 +109,6 @@ function EditToolbar(props) {
     };
 
     const handleRun = () => {
-        console.log(rows);
         axios({
             url: '/api/classify',
             method: 'post',

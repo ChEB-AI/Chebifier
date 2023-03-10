@@ -70,7 +70,6 @@ const LayerComponent = (data) => {
 
 export function LayerTabs(layers) {
     const [value, setValue] = React.useState(0);
-    console.log(layers);
     const handleChange = (event, newValue) => {
         setValue(newValue);
     };
