@@ -99,7 +99,7 @@ function EditToolbar(props) {
 
     const handleDownload = (event) => {
         event.preventDefault();
-        const fileData = JSON.stringify(rows.map((r) => ({"smiles": r["smiles"], "direct_parents": r["direct_parents"],"predicted_parents": r["predicted_parents"],})).filter((d) => d["direct_parents"].length !== 0));
+        const fileData = JSON.stringify(rows.map((r) => ({"smiles": r["smiles"], "direct_parents": r["direct_parents"],"predicted_parents": r["predicted_parents"],})).filter((d) => d.direct_parents?.length >= 0));
         const blob = new Blob([fileData], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -140,7 +140,7 @@ function EditToolbar(props) {
             <Button color="primary" startIcon={<StartIcon/>} onClick={handleRun}>
                 Predict classes
             </Button>
-            <Button color="primary" startIcon={<FileDownloadIcon/>} onClick={handleDownload} disabled={rows.filter((d) => d["direct_parents"].length !== 0).length === 0}>
+            <Button color="primary" startIcon={<FileDownloadIcon/>} onClick={handleDownload} disabled={rows.filter((d) => d.direct_parents?.length > 0).length === 0}>
                 Download JSON
             </Button>
         </GridToolbarContainer>
@@ -241,7 +241,7 @@ export default function ClassificationGrid() {
             getActions: ({id}) => {
                 const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
                 const thisRow = rows.find((row) => row.id === id);
-                const wasPredicted = thisRow.direct_parents.length > 0;
+                const wasPredicted = thisRow.direct_parents?.length > 0;
 
                 if (isInEditMode) {
                     return [

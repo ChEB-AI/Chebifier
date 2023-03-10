@@ -88,9 +88,6 @@ class HierarchyAPI(Resource):
 
 
 class BatchPrediction(Resource):
-
-
-
     def post(self):
         """
         Accepts a dictionary with the following structure
@@ -121,19 +118,27 @@ class BatchPrediction(Resource):
             try:
                 # Try to parse the smiles string
                 d = reader.to_data(dict(features=s, labels=None))
-            except:
+                # This is just for sanity checks
+                rdmol = Chem.MolFromSmiles(s, sanitize=False)
+            except Exception as e:
                 # Note if it fails
                 could_not_parse.append(i)
             else:
-                index_map[i] = len(token_dicts)
-                token_dicts.append(d)
+                if rdmol is None:
+                    could_not_parse.append(i)
+                else:
+                    index_map[i] = len(token_dicts)
+                    token_dicts.append(d)
         results = []
-        for batch in batchify(token_dicts):
-            dat = electra_model._get_data_and_labels(collater(batch), 0)
-            result = electra_model(dat, **dat["model_kwargs"])
-            results += result["logits"].cpu().detach().tolist()
+        if token_dicts:
+            for batch in batchify(token_dicts):
+                dat = electra_model._get_data_and_labels(collater(batch), 0)
+                result = electra_model(dat, **dat["model_kwargs"])
+                results += result["logits"].cpu().detach().tolist()
 
-        chebi, predicted_parents = get_relevant_chebi_fragment(np.stack(results, axis=0), smiles)
+            chebi, predicted_parents = get_relevant_chebi_fragment(np.stack(results, axis=0), smiles)
+        else:
+            chebi, predicted_parents = ([], [])
 
         return {
             "predicted_parents": [(None if i in could_not_parse else predicted_parents[index_map[i]]) for i in range(len(smiles))],
