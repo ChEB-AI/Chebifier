@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useEffect } from 'react';
 import axios from "axios";
+import Alert from '@mui/material/Alert';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -205,7 +206,7 @@ export default function ClassificationGrid() {
     const renderClasses = (params) => {
         const data = params.value;
         if (data == null){
-          return  <Typography>Could not process input</Typography>
+          return  <Alert severity="error">Could not process input!</Alert>
         } else {
             return <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
                 {(data.map((x) => <Chip component="a" href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")} label={hierarchy[x].label} clickable target="_blank"/>))}
