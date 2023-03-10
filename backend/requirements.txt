@@ -2,3 +2,4 @@ flask
 flask-restful
 flask-cors
 chebai
+rdkit

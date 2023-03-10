@@ -13,6 +13,8 @@ from app import app
 import matplotlib as mpl
 import json
 import networkx as nx
+from rdkit import Chem
+from rdkit.Chem.Draw import rdMolDraw2D
 
 mpl.use("TkAgg")
 
@@ -218,17 +220,16 @@ class PredictionDetailApiHandler(Resource):
 
         chebi, predicted_parents = get_relevant_chebi_fragment(result["logits"].detach().numpy(), [smiles])
 
-        atts = np.concatenate([a.detach().numpy() for a in result["attentions"]])
-
         with NamedTemporaryFile(mode="wt", suffix=".png") as svg1:
-            d = plotter.draw_attention_molecule(
-                smiles, np.max(np.max(atts, axis=2), axis=1)
-            )
+            rdmol = Chem.MolFromSmiles(smiles)
+            d = rdMolDraw2D.MolDraw2DCairo(500, 500)
+            rdMolDraw2D.PrepareAndDrawMolecule(d, rdmol)
+            d.FinishDrawing()
             d.WriteDrawingText(svg1.name)
             mol_pic = self.load_image(svg1.name)
 
         return {
-            "figures": {"attention_mol": mol_pic},
+            "figures": {"plain_molecule": mol_pic},
             "graphs": graphs,
             "classification": nx_to_graph(chebi)
         }

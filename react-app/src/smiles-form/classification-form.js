@@ -219,7 +219,7 @@ export default function ClassificationGrid() {
         const thisRow = rows.find((row) => row.id === id);
         axios.post('/api/details', {smiles: thisRow.smiles}).then(response => {
             setDetail({
-                attention_fig: response.data.figures.attention_mol,
+                plain_molecule: response.data.figures.plain_molecule,
                 graphs: response.data.graphs,
                 chebi: response.data.classification
             });

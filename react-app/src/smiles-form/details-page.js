@@ -97,15 +97,21 @@ const Item = styled(Paper)(({theme}) => ({
     color: theme.palette.textsecondary,
 }));
 
-const Molecule = ({data}) => <img src={`data:image/jpeg;base64,${data}`} hidden={(data === null)} width="400"
-                                  height="400"/>;
-
 export default function DetailsPage(data) {
     data = data.detail;
     return (
         <Box width={'100%'}>
             <Box>
                 <Paper>
+                    <Box>
+                        <Typography><h2>Molecular structure</h2></Typography>
+                        <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+}}>
+                        <img src={`data:image/jpeg;base64,${data.plain_molecule}`} width="300" height="300"/></div>
+                    </Box>
                     <Box>
                         <Typography><h2>ChEBI Classification</h2></Typography>
                         <Typography><h3>What am I seeing?</h3>
