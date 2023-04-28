@@ -18,7 +18,11 @@ def serve(path):
     return send_from_directory(app.static_folder, 'index.html')
 
 
-from api.chemclass import PredictionDetailApiHandler, BatchPrediction, HierarchyAPI
-api.add_resource(PredictionDetailApiHandler, '/api/details')
-api.add_resource(BatchPrediction, '/api/classify')
-api.add_resource(HierarchyAPI, '/api/hierarchy')
+
+@app.before_first_request
+def load_endpoints():
+    from api.chemclass import PredictionDetailApiHandler, BatchPrediction, \
+        HierarchyAPI
+    api.add_resource(PredictionDetailApiHandler, '/api/details')
+    api.add_resource(BatchPrediction, '/api/classify')
+    api.add_resource(HierarchyAPI, '/api/hierarchy')
