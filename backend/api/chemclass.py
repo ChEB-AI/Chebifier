@@ -55,6 +55,7 @@ def get_relevant_chebi_fragment(predictions, smiles, labels=None):
     necessary_nodes = set()
     for i in range(predictions.shape[0]):
         fragment_graph.nodes[i]["lbl"] = labels[i] if labels else smiles[i]
+        fragment_graph.nodes[i]["artificial"] = True
         necessary_nodes = necessary_nodes.union(set(nx.shortest_path(fragment_graph, i)))
     sub = nx.transitive_reduction(fragment_graph.subgraph(necessary_nodes))
 
@@ -66,7 +67,7 @@ def get_relevant_chebi_fragment(predictions, smiles, labels=None):
 
 def nx_to_graph(g: nx.Graph):
     return dict(
-        nodes=[dict(id=n, label=g.nodes[n]["lbl"]) for n in g.nodes],
+        nodes=[dict(id=n, label=g.nodes[n]["lbl"], color="#EEEEEC" if g.nodes[n].get("artificial") else "#729FCF") for n in g.nodes],
         edges=[{"from":a, "to":b, "arrows":dict(to=True)} for (a,b) in g.edges]
     )
 
@@ -93,21 +94,25 @@ class BatchPrediction(Resource):
         Accepts a dictionary with the following structure
         {
             "smiles": [ ... list of smiles strings]
+            "ontology": bool (Optional)
         }
         :return:
         A dictionary wit hthe following structure
         {
             "predicted_parents": [ ... [... parent classes as predicted by the system] or None for each smiles ],
             "direct_parents": [ ... [... lowest possible predicted parents] or None for each smiles ] or None
+            "ontology": Only returened if `ontology` is set. Returns a vis.js conform representation of the ontology containing all predicted classes.
         }
 
-        If the system us unable to parse any smiles string, the respective entry in each list will be `None`
+        If the system us unable to parse any smiles string, the respective entry in each list will be `None`.
         """
 
         parser = reqparse.RequestParser()
         parser.add_argument("smiles", type=str, action="append")
+        parser.add_argument("ontology", type=bool, required=False, default=False)
         args = parser.parse_args()
         smiles = args["smiles"]
+        generate_ontology = args["ontology"]
 
         reader = ChemDataReader()
         collater = RaggedCollater()
@@ -140,10 +145,17 @@ class BatchPrediction(Resource):
         else:
             chebi, predicted_parents = ([], [])
 
-        return {
+        result = {
             "predicted_parents": [(None if i in could_not_parse else predicted_parents[index_map[i]]) for i in range(len(smiles))],
-            "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))]
+            "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))],
+
         }
+
+        if generate_ontology:
+            result["ontology"] = nx_to_graph(chebi)
+
+
+        return result
 
 
 class PredictionDetailApiHandler(Resource):

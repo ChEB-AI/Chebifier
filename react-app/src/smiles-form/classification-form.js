@@ -29,7 +29,9 @@ import {
 import {
     randomId,
 } from '@mui/x-data-grid-generator';
+
 import DetailsPage from "./details-page";
+import {plot_ontology} from "./ontology-utils";
 
 const RenderDate = (props) => {
   const { hasFocus, value } = props;
@@ -72,7 +74,7 @@ const RenderDate = (props) => {
 };
 
 function EditToolbar(props) {
-    const {setRows, setRowModesModel, rows, getLabel} = props;
+    const {setRows, setRowModesModel, rows, getLabel, setOntology} = props;
 
     const addRows = ((smiles) => {
             const ids = smiles.map((s) => randomId());
@@ -113,11 +115,12 @@ function EditToolbar(props) {
         axios({
             url: '/api/classify',
             method: 'post',
-            data: {smiles: rows.map((r) => (r["smiles"]))}
+            data: {smiles: rows.map((r) => (r["smiles"])), ontology: true}
         }).then(response => {
             setRows((oldRows) => oldRows.map((row, i) => ({
                 ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i],
             })));
+            setOntology(response.data.ontology)
         });
     };
 
@@ -157,6 +160,8 @@ export default function ClassificationGrid() {
     const [rowModesModel, setRowModesModel] = React.useState({});
     const [detail, setDetail] = React.useState(null);
     const [hierarchy, setHierarchy] = React.useState({});
+
+    const [ontology, setOntology] = React.useState(null);
 
     if (Object.keys(hierarchy).length === 0) {
         axios.get('/api/hierarchy').then(response => {
@@ -323,11 +328,15 @@ export default function ClassificationGrid() {
                             Toolbar: EditToolbar,
                         }}
                         componentsProps={{
-                            toolbar: {setRows, setRowModesModel, rows, getLabel},
+                            toolbar: {setRows, setRowModesModel, rows, getLabel, setOntology},
                         }}
                         experimentalFeatures={{newEditingApi: true}}
                     />
                 </Box>
+            </Paper>
+
+            <Paper>
+                {plot_ontology(ontology)}
             </Paper>
 
             <Modal

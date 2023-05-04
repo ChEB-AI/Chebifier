@@ -24,26 +24,8 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {styled} from '@mui/material/styles';
 
-const VisNetwork = (data) => {
-
-    const visJsRef = useRef(null);
-    useEffect(() => {
-        const network =
-            visJsRef.current &&
-            new Network(visJsRef.current, data.graph, {
-                physics: {enabled: data.physics},
-                layout: data.layout,
-                width: data.width || "100%",
-                height: data.height || "100%",
-                clickToUse: true
-            });
-        network.fit();
-    }, [visJsRef, data]);
-
-    return <Box>
-        <div ref={visJsRef}/>
-    </Box>;
-};
+import {VisNetwork} from "./ontology-utils";
+import {plot_ontology} from "./ontology-utils";
 
 const LayerComponent = (data) => {
     const [value, setValue] = React.useState(0);
@@ -118,17 +100,7 @@ export default function DetailsPage(data) {
                             proposed. Not that this prediction is an estimate based on available data and may be
                             prone to errors.</Typography>
                         <Box>
-                            <VisNetwork graph={data.chebi} physics={false}
-                                        layout={{
-                                            hierarchical: {
-                                                enabled: true,
-                                                direction: "LR",
-                                                sortMethod: "directed",
-                                                levelSeparation: 250,
-                                            }
-                                        }}
-                                        height={"400px"}
-                            />
+                            {plot_ontology(data.chebi)}
                         </Box>
                     </Box>
                     <Box>
