@@ -20,6 +20,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
 import StartIcon from '@mui/icons-material/Start';
 import Modal from '@mui/material/Modal';
+
 import {
     GridRowModes,
     DataGrid,
@@ -336,7 +337,7 @@ export default function ClassificationGrid() {
             </Paper>
 
             <Paper>
-                {plot_ontology(ontology)}
+                {plot_ontology(ontology,true,false)}
             </Paper>
 
             <Modal

@@ -64,11 +64,20 @@ def get_relevant_chebi_fragment(predictions, smiles, labels=None):
     keys = set(i for i,_ in predicted_subsumtions)
     return sub, {k: [l for j,l in predicted_subsumtions if j == k] for k in keys}
 
+def _build_node(ident, node, include_labels=True):
+    d = dict(id=ident,
+         color="#EEEEEC" if node.get("artificial") else "#729FCF")
+    d["title"] = node["lbl"]
+    if include_labels:
+        d["label"] = node["lbl"]
+
+    return d
+
 
 def nx_to_graph(g: nx.Graph):
     return dict(
-        nodes=[dict(id=n, label=g.nodes[n]["lbl"], color="#EEEEEC" if g.nodes[n].get("artificial") else "#729FCF") for n in g.nodes],
-        edges=[{"from":a, "to":b, "arrows":dict(to=True)} for (a,b) in g.edges]
+        nodes={n: g.nodes[n] for n in g.nodes},
+        edges=list(g.edges)
     )
 
 
@@ -153,7 +162,6 @@ class BatchPrediction(Resource):
 
         if generate_ontology:
             result["ontology"] = nx_to_graph(chebi)
-
 
         return result
 

@@ -1,6 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
 import ClassificationGrid from './smiles-form/classification-form.js'
+import '../node_modules/vis-network/styles/vis-network.css';
 
 function App() {
   return (
