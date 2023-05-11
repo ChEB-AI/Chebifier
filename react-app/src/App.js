@@ -10,7 +10,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <ClassificationGrid />
-        <footer><Link component="button" variant="body2" href="https://github.com/ChEB-AI/Chebifier/issues">Report an issue</Link></footer>
+        <footer><Link variant="body2" href="https://github.com/ChEB-AI/Chebifier/issues">Report an issue</Link></footer>
       </header>
     </div>
   );
