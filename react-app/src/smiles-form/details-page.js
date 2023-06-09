@@ -24,8 +24,28 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {styled} from '@mui/material/styles';
 
-import {VisNetwork} from "./ontology-utils";
 import {plot_ontology} from "./ontology-utils";
+
+const NetworkElement = (data) => {
+    const visJsRef = useRef(null);
+    useEffect(() => {
+        if(data.graph != null){
+            const g = {
+                nodes: data.graph.nodes,
+                edges: data.graph.edges
+            }
+            const network = visJsRef.current && new Network(
+                visJsRef.current, g, {
+                physics: false,
+                width: "100%",
+                height: "100%",
+                clickToUse: true
+            });
+            network.fit()
+        }
+    }, [visJsRef, data]);
+    return <Box><div ref={visJsRef}/></Box>
+}
 
 const LayerComponent = (data) => {
     const [value, setValue] = React.useState(0);
@@ -42,8 +62,7 @@ const LayerComponent = (data) => {
                         {data.layer.map((layer, i) => <Tab label={"Head " + (i + 1)} value={i}/>)}
                     </TabList>
                 </Box>
-                {data.layer.map((g, i) => <TabPanel value={i}><VisNetwork graph={g} physics={false}
-                                                                          layout={{}}/></TabPanel>)}
+                {data.layer.map((g, i) => <TabPanel value={i}>< NetworkElement graph={g} /></TabPanel>)}
             </TabContext>
         </Box>
     );
