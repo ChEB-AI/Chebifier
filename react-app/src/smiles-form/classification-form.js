@@ -350,12 +350,14 @@ export default function ClassificationGrid() {
                   mb: 2,
                   display: "flex",
                   flexDirection: "column",
-                  height: 700,
-                  overflow: "hidden",
-                  overflowY: "scroll",
+                  width: '95%',
+                  height: '95%',
+                  position: 'fixed',
+                  left: '2.5%',
+                  top: '2.5%',
                 }}>
-                    <Button color="primary" onClick={handleClose} startIcon={<CancelIcon/>}/>
-                    <DetailsPage detail={detail} />
+
+                    <DetailsPage detail={detail} handleClose={handleClose}/>
                 </Box>
             </Modal>
 
