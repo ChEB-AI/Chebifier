@@ -1,3 +1,4 @@
+import torch.cuda
 from flask_restful import Api, Resource, reqparse
 from chebai.models.electra import Electra
 from chebai.preprocessing.reader import ChemDataReader, EMBEDDING_OFFSET
@@ -15,25 +16,17 @@ import json
 import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
-
+import torch
 mpl.use("TkAgg")
 
-model_kwargs = dict(
-    optimizer_kwargs=dict(lr=1e-4),
-    pretrained_checkpoint=app.config["ELECTRA_CHECKPOINT"],
-    out_dim=854,
-    config=dict(
-        vocab_size=1400,
-        max_position_embeddings=1800,
-        num_attention_heads=8,
-        num_hidden_layers=6,
-        type_vocab_size=1,
-    ),
-)
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
 
 BATCH_SIZE = app.config.get("BATCH_SIZE", 100)
 
-electra_model = Electra(**model_kwargs)
+electra_model = Electra.load_from_checkpoint(app.config["ELECTRA_CHECKPOINT"], map_location=torch.device(device), pretrained_checkpoint=None, criterion=None, strict=False, train_metrics=None, test_metrics=None, validation_metrics=None, metrics=None)
 electra_model.eval()
 
 PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
@@ -146,7 +139,7 @@ class BatchPrediction(Resource):
         results = []
         if token_dicts:
             for batch in batchify(token_dicts):
-                dat = electra_model._get_data_and_labels(collater(batch), 0)
+                dat = electra_model._process_batch(collater(batch), 0)
                 result = electra_model(dat, **dat["model_kwargs"])
                 results += result["logits"].cpu().detach().tolist()
 
