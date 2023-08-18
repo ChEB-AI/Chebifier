@@ -3,3 +3,4 @@ flask-restful
 flask-cors
 chebai
 rdkit
+lightning

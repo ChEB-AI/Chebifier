@@ -9,6 +9,7 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CancelIcon from '@mui/icons-material/Close';
 import Divider from '@mui/material/Divider';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FormControl from '@mui/material/FormControl';
@@ -24,26 +25,28 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {styled} from '@mui/material/styles';
 
-const VisNetwork = (data) => {
+import {plot_ontology} from "./ontology-utils";
 
+const NetworkElement = (data) => {
     const visJsRef = useRef(null);
     useEffect(() => {
-        const network =
-            visJsRef.current &&
-            new Network(visJsRef.current, data.graph, {
-                physics: {enabled: data.physics},
-                layout: data.layout,
-                width: data.width || "100%",
-                height: data.height || "100%",
+        if(data.graph != null){
+            const g = {
+                nodes: data.graph.nodes,
+                edges: data.graph.edges
+            }
+            const network = visJsRef.current && new Network(
+                visJsRef.current, g, {
+                physics: false,
+                width: "100%",
+                height: "100%",
                 clickToUse: true
             });
-        network.fit();
+            network.fit()
+        }
     }, [visJsRef, data]);
-
-    return <Box>
-        <div ref={visJsRef}/>
-    </Box>;
-};
+    return <Box><div ref={visJsRef}/></Box>
+}
 
 const LayerComponent = (data) => {
     const [value, setValue] = React.useState(0);
@@ -60,8 +63,7 @@ const LayerComponent = (data) => {
                         {data.layer.map((layer, i) => <Tab label={"Head " + (i + 1)} value={i}/>)}
                     </TabList>
                 </Box>
-                {data.layer.map((g, i) => <TabPanel value={i}><VisNetwork graph={g} physics={false}
-                                                                          layout={{}}/></TabPanel>)}
+                {data.layer.map((g, i) => <TabPanel value={i}>< NetworkElement graph={g} /></TabPanel>)}
             </TabContext>
         </Box>
     );
@@ -97,50 +99,58 @@ const Item = styled(Paper)(({theme}) => ({
 }));
 
 export default function DetailsPage(data) {
+    const handleClose = data.handleClose;
     data = data.detail;
+
     return (
-        <Box width={'100%'}>
-            <Box>
-                <Paper>
-                    <Box>
-                        <Typography><h2>Molecular structure</h2></Typography>
-                        <div style={{
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-}}>
-                        <img src={`data:image/jpeg;base64,${data.plain_molecule}`} width="300" height="300"/></div>
-                    </Box>
-                    <Box>
-                        <Typography><h2>ChEBI Classification</h2></Typography>
-                        <Typography><h3>What am I seeing?</h3>
-                            The graph below shows you the position in the ChEBI ontology that our system
-                            proposed. Not that this prediction is an estimate based on available data and may be
-                            prone to errors.</Typography>
-                        <Box>
-                            <VisNetwork graph={data.chebi} physics={false}
-                                        layout={{
-                                            hierarchical: {
-                                                enabled: true,
-                                                direction: "LR",
-                                                sortMethod: "directed",
-                                                levelSeparation: 250,
-                                            }
-                                        }}
-                                        height={"400px"}
-                            />
-                        </Box>
-                    </Box>
-                    <Box>
-                        <Typography><h2>Attention</h2></Typography>
-                        <Typography><h3>What am I seeing?</h3>
-                            The model iterates over all parts of the molecule. For each of this parts, the
-                            system is distributing its attention over all parts of the molecule. E.g. if an
-                            opening parenthesis is encountered, the system may try to identify the closing
-                            counterpart. The parts of the molecule that the system is paying attention to, are
-                            indicated by lines. Darker shades indicate stronger attention.</Typography>
-                        <Box sx={{height: "400px"}}>
-                            <LayerTabs layers={data.graphs}/>
+        <Box sx={{ height: '100%'}}>
+            <Box sx={{ height: '100%'}}>
+                <Paper sx={{ height: '100%'}}>
+                    <Button color="primary" onClick={handleClose} startIcon={<CancelIcon/>}/>
+                    <Box sx={{
+                        overflowX: "scroll",
+                        overflowY: "scroll",
+                        overflow: "auto",
+                        display: "flex",
+                        flexDirection: "column",
+                        position: 'relative',
+                        width: '94%',
+                        height: '94%',
+                        top: '1%',
+                        left: '1%'
+                    }}>
+                        <Box sx={{ height: '100%'}}>
+                            <Box>
+                                <Typography><h2>Molecular structure</h2></Typography>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}>
+                                <img src={`data:image/jpeg;base64,${data.plain_molecule}`} width="300" height="300"/></div>
+                            </Box>
+                            <Box>
+                                <Typography><h2>ChEBI Classification</h2></Typography>
+                                <Typography><h3>What am I seeing?</h3>
+                                    The graph below shows you the position in the ChEBI ontology that our system
+                                    proposed. Not that this prediction is an estimate based on available data and may be
+                                    prone to errors.</Typography>
+                                <Box>
+                                    {plot_ontology(data.chebi)}
+                                </Box>
+                            </Box>
+                            <Box>
+                                <Typography><h2>Attention</h2></Typography>
+                                <Typography><h3>What am I seeing?</h3>
+                                    The model iterates over all parts of the molecule. For each of this parts, the
+                                    system is distributing its attention over all parts of the molecule. E.g. if an
+                                    opening parenthesis is encountered, the system may try to identify the closing
+                                    counterpart. The parts of the molecule that the system is paying attention to, are
+                                    indicated by lines. Darker shades indicate stronger attention.</Typography>
+                                <Box sx={{height: "400px"}}>
+                                    <LayerTabs layers={data.graphs}/>
+                                </Box>
+                            </Box>
                         </Box>
                     </Box>
                 </Paper>

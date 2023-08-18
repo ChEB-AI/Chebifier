@@ -1,3 +1,4 @@
+import torch.cuda
 from flask_restful import Api, Resource, reqparse
 from chebai.models.electra import Electra
 from chebai.preprocessing.reader import ChemDataReader, EMBEDDING_OFFSET
@@ -15,25 +16,17 @@ import json
 import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
-
+import torch
 mpl.use("TkAgg")
 
-model_kwargs = dict(
-    optimizer_kwargs=dict(lr=1e-4),
-    pretrained_checkpoint=app.config["ELECTRA_CHECKPOINT"],
-    out_dim=854,
-    config=dict(
-        vocab_size=1400,
-        max_position_embeddings=1800,
-        num_attention_heads=8,
-        num_hidden_layers=6,
-        type_vocab_size=1,
-    ),
-)
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
 
 BATCH_SIZE = app.config.get("BATCH_SIZE", 100)
 
-electra_model = Electra(**model_kwargs)
+electra_model = Electra.load_from_checkpoint(app.config["ELECTRA_CHECKPOINT"], map_location=torch.device(device), pretrained_checkpoint=None, criterion=None, strict=False, train_metrics=None, test_metrics=None, validation_metrics=None, metrics=None)
 electra_model.eval()
 
 PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
@@ -55,6 +48,7 @@ def get_relevant_chebi_fragment(predictions, smiles, labels=None):
     necessary_nodes = set()
     for i in range(predictions.shape[0]):
         fragment_graph.nodes[i]["lbl"] = labels[i] if labels else smiles[i]
+        fragment_graph.nodes[i]["artificial"] = True
         necessary_nodes = necessary_nodes.union(set(nx.shortest_path(fragment_graph, i)))
     sub = nx.transitive_reduction(fragment_graph.subgraph(necessary_nodes))
 
@@ -63,11 +57,20 @@ def get_relevant_chebi_fragment(predictions, smiles, labels=None):
     keys = set(i for i,_ in predicted_subsumtions)
     return sub, {k: [l for j,l in predicted_subsumtions if j == k] for k in keys}
 
+def _build_node(ident, node, include_labels=True):
+    d = dict(id=ident,
+         color="#EEEEEC" if node.get("artificial") else "#729FCF")
+    d["title"] = node["lbl"]
+    if include_labels:
+        d["label"] = node["lbl"]
+
+    return d
+
 
 def nx_to_graph(g: nx.Graph):
     return dict(
-        nodes=[dict(id=n, label=g.nodes[n]["lbl"]) for n in g.nodes],
-        edges=[{"from":a, "to":b, "arrows":dict(to=True)} for (a,b) in g.edges]
+        nodes={n: g.nodes[n] for n in g.nodes},
+        edges=list(g.edges)
     )
 
 
@@ -93,21 +96,25 @@ class BatchPrediction(Resource):
         Accepts a dictionary with the following structure
         {
             "smiles": [ ... list of smiles strings]
+            "ontology": bool (Optional)
         }
         :return:
         A dictionary wit hthe following structure
         {
             "predicted_parents": [ ... [... parent classes as predicted by the system] or None for each smiles ],
             "direct_parents": [ ... [... lowest possible predicted parents] or None for each smiles ] or None
+            "ontology": Only returened if `ontology` is set. Returns a vis.js conform representation of the ontology containing all predicted classes.
         }
 
-        If the system us unable to parse any smiles string, the respective entry in each list will be `None`
+        If the system us unable to parse any smiles string, the respective entry in each list will be `None`.
         """
 
         parser = reqparse.RequestParser()
         parser.add_argument("smiles", type=str, action="append")
+        parser.add_argument("ontology", type=bool, required=False, default=False)
         args = parser.parse_args()
         smiles = args["smiles"]
+        generate_ontology = args["ontology"]
 
         reader = ChemDataReader()
         collater = RaggedCollater()
@@ -132,7 +139,7 @@ class BatchPrediction(Resource):
         results = []
         if token_dicts:
             for batch in batchify(token_dicts):
-                dat = electra_model._get_data_and_labels(collater(batch), 0)
+                dat = electra_model._process_batch(collater(batch), 0)
                 result = electra_model(dat, **dat["model_kwargs"])
                 results += result["logits"].cpu().detach().tolist()
 
@@ -140,10 +147,16 @@ class BatchPrediction(Resource):
         else:
             chebi, predicted_parents = ([], [])
 
-        return {
+        result = {
             "predicted_parents": [(None if i in could_not_parse else predicted_parents[index_map[i]]) for i in range(len(smiles))],
-            "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))]
+            "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))],
+
         }
+
+        if generate_ontology:
+            result["ontology"] = nx_to_graph(chebi)
+
+        return result
 
 
 class PredictionDetailApiHandler(Resource):
