@@ -13,10 +13,9 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        node-version: [14.x, 16.x, 18.x]
+        node-version: [18.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
@@ -25,7 +24,14 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
+        cache-dependency-path: react-app/package-lock.json
         cache: 'npm'
-    - run: npm ci
-    - run: npm run build --if-present
-    - run: npm test
+    - name: CI
+      working-directory: react-app
+      run: npm ci
+    - name: build
+      working-directory: react-app
+      run: npm run build --if-present
+    - name: test
+      working-directory: react-app
+      run: npm test
