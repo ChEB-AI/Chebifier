@@ -17,7 +17,7 @@ import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import torch
-mpl.use("TkAgg")
+mpl.use("Agg")
 
 if torch.cuda.is_available():
     device = "cuda"
