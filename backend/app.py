@@ -1,6 +1,7 @@
 from flask import Flask, send_from_directory
 from flask_restful import Api, Resource, reqparse
 from flask_cors import CORS  # comment this on deployment
+import torch.multiprocessing as mp
 
 import json
 
@@ -27,4 +28,5 @@ def load_endpoints():
 
 
 with app.app_context():
+    mp.set_start_method("spawn")
     load_endpoints()
