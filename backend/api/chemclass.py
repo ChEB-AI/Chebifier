@@ -139,7 +139,7 @@ class BatchPrediction(Resource):
         results = []
         if token_dicts:
             for batch in batchify(token_dicts):
-                dat = electra_model._process_batch(collater(batch), 0)
+                dat = electra_model._process_batch(collater(batch).to(electra_model.device), 0)
                 result = electra_model(dat, **dat["model_kwargs"])
                 results += result["logits"].cpu().detach().tolist()
 
