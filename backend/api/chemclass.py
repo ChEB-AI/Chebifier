@@ -25,9 +25,21 @@ else:
     device = "cpu"
 
 BATCH_SIZE = app.config.get("BATCH_SIZE", 100)
+electra_model = None
 
-electra_model = Electra.load_from_checkpoint(app.config["ELECTRA_CHECKPOINT"], map_location=torch.device(device), pretrained_checkpoint=None, criterion=None, strict=False, metrics=dict(train=dict(), test=dict(), validation=dict()))
-electra_model.eval()
+
+def load_model():
+    global electra_model
+    electra_model = Electra.load_from_checkpoint(app.config["ELECTRA_CHECKPOINT"], map_location=torch.device(device), pretrained_checkpoint=None, criterion=None, strict=False, metrics=dict(train=dict(), test=dict(), validation=dict()))
+    electra_model.eval()
+
+try:
+    import uwsgidecorators
+except ModuleNotFoundError:
+    load_model()
+else:
+    load_model = uwsgidecorators.postfork(load_model)
+
 
 PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
 LABEL_HIERARCHY = json.load(open(app.config["CHEBI_JSON"]))
