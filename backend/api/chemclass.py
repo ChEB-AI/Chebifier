@@ -251,7 +251,7 @@ class PredictionDetailApiHandler(Resource):
             for a in result["attentions"]
         ]
 
-        chebi, predicted_parents = get_relevant_chebi_fragment(result["logits"].detach().numpy(), [smiles])
+        chebi, predicted_parents = get_relevant_chebi_fragment(result["logits"].detach().cpu().numpy(), [smiles])
 
         with NamedTemporaryFile(mode="wt", suffix=".png") as svg1:
             rdmol = Chem.MolFromSmiles(smiles)
