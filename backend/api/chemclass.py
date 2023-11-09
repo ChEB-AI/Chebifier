@@ -85,6 +85,13 @@ def batchify(l):
         yield cache
 
 
+def calculate_results(batch):
+    collater = RaggedCollater()
+    dat = electra_model._process_batch(collater(batch).to(electra_model.device), 0)
+    dat["features"] = dat["features"].int()
+    return electra_model(dat, **dat["model_kwargs"])
+
+
 class HierarchyAPI(Resource):
     def get(self):
         return {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses",[])) for r in LABEL_HIERARCHY}
@@ -139,8 +146,7 @@ class BatchPrediction(Resource):
         results = []
         if token_dicts:
             for batch in batchify(token_dicts):
-                dat = electra_model._process_batch(collater(batch).to(electra_model.device), 0)
-                result = electra_model(dat, **dat["model_kwargs"])
+                result = calculate_results(batch)
                 results += result["logits"].cpu().detach().tolist()
 
             chebi, predicted_parents = get_relevant_chebi_fragment(np.stack(results, axis=0), smiles)
@@ -215,11 +221,9 @@ class PredictionDetailApiHandler(Resource):
         smiles = args["smiles"]
 
         reader = ChemDataReader()
-        collater = RaggedCollater()
         token_dict = reader.to_data(dict(features=smiles, labels=None))
         tokens = np.array(token_dict["features"]).astype(int).tolist()
-        tokenised_input = electra_model._get_data_and_labels(collater([token_dict]), 0)
-        result = electra_model(tokenised_input)
+        result = calculate_results([token_dict])
 
         token_labels = (
             ["[CLR]"] + [None for _ in range(EMBEDDING_OFFSET - 1)] + reader.cache
