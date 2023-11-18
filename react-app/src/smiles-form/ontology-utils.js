@@ -57,8 +57,8 @@ function renderOverview(node, graph){
 
     }
     const nodeDict = Object.fromEntries(graph.nodes.map(x => [x["id"], x]));
-    const superclasses = graph.edges.filter((e) => (e["from"] == node)).map((e) => renderClassListElement(e["to"], nodeDict[e["to"]]))
-    const subclasses = graph.edges.filter((e) => (e["to"] == node)).map((e) => renderClassListElement(e["from"], nodeDict[e["from"]]))
+    const superclasses = graph.edges.filter((e) => (e["from"] === node)).map((e) => renderClassListElement(e["to"], nodeDict[e["to"]]))
+    const subclasses = graph.edges.filter((e) => (e["to"] === node)).map((e) => renderClassListElement(e["from"], nodeDict[e["from"]]))
 
     return (<Box>
         <List dense={true}>
