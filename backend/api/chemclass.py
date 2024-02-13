@@ -143,6 +143,8 @@ class BatchPrediction(Resource):
         for i, s in enumerate(smiles):
             try:
                 # Try to parse the smiles string
+                if not s:
+                    raise ValueError()
                 d = reader.to_data(dict(features=s, labels=None))
                 # This is just for sanity checks
                 rdmol = Chem.MolFromSmiles(s, sanitize=False)
