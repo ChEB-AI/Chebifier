@@ -151,11 +151,6 @@ function EditToolbar(props) {
     );
 }
 
-EditToolbar.propTypes = {
-    setRowModesModel: PropTypes.func.isRequired,
-    setRows: PropTypes.func.isRequired,
-};
-
 export default function ClassificationGrid() {
     const [rows, setRows] = React.useState([]);
     const [rowModesModel, setRowModesModel] = React.useState({});
@@ -170,43 +165,20 @@ export default function ClassificationGrid() {
         });
     }
 
-
-    const handleRowEditStart = (params, event) => {
-        event.defaultMuiPrevented = true;
-    };
-
-    const handleRowEditStop = (params, event) => {
-        event.defaultMuiPrevented = true;
-    };
-
-    const handleEditClick = (id) => () => {
-        setRowModesModel({...rowModesModel, [id]: {mode: GridRowModes.Edit}});
-    };
-
-    const handleSaveClick = (id) => () => {
-        setRowModesModel({...rowModesModel, [id]: {mode: GridRowModes.View}});
-    };
-
     const handleDeleteClick = (id) => () => {
         setRows(rows.filter((row) => row.id !== id));
     };
 
-    const handleCancelClick = (id) => () => {
-        setRowModesModel({
-            ...rowModesModel,
-            [id]: {mode: GridRowModes.View, ignoreModifications: true},
-        });
-
-        const editedRow = rows.find((row) => row.id === id);
-        if (editedRow.isNew) {
-            setRows(rows.filter((row) => row.id !== id));
-        }
-    };
-
     const processRowUpdate = (newRow) => {
-        const updatedRow = {...newRow, isNew: false};
-        setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)));
-        return updatedRow;
+        const oldRow = rows.find(row => (row.id === newRow.id))
+        if (oldRow.smiles != newRow.smiles) {
+            newRow.predicted_parents = [];
+            newRow.direct_parents = [];
+            newRow.isNew = false;
+        }
+        console.log(newRow);
+        setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
+        return newRow;
     };
 
     const renderClasses = (params) => {
@@ -249,31 +221,7 @@ export default function ClassificationGrid() {
                 const thisRow = rows.find((row) => row.id === id);
                 const wasPredicted = thisRow.direct_parents?.length > 0;
 
-                if (isInEditMode) {
-                    return [
-                        <GridActionsCellItem
-                            icon={<SaveIcon/>}
-                            label="Save"
-                            onClick={handleSaveClick(id)}
-                        />,
-                        <GridActionsCellItem
-                            icon={<CancelIcon/>}
-                            label="Cancel"
-                            className="textPrimary"
-                            onClick={handleCancelClick(id)}
-                            color="inherit"
-                        />,
-                    ];
-                }
-
                 return [
-                    <GridActionsCellItem
-                        icon={<EditIcon/>}
-                        label="Edit"
-                        className="textPrimary"
-                        onClick={handleEditClick(id)}
-                        color="inherit"
-                    />,
                     <GridActionsCellItem
                         icon={<DeleteIcon/>}
                         label="Delete"
@@ -321,8 +269,6 @@ export default function ClassificationGrid() {
                         editMode="row"
                         rowModesModel={rowModesModel}
                         onRowModesModelChange={(newModel) => setRowModesModel(newModel)}
-                        onRowEditStart={handleRowEditStart}
-                        onRowEditStop={handleRowEditStop}
                         processRowUpdate={processRowUpdate}
                         getRowHeight={() => 'auto'}
                         components={{
