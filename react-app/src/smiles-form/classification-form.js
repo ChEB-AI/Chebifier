@@ -176,7 +176,6 @@ export default function ClassificationGrid() {
             newRow.direct_parents = [];
             newRow.isNew = false;
         }
-        console.log(newRow);
         setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
         return newRow;
     };
@@ -208,7 +207,19 @@ export default function ClassificationGrid() {
     const handleClose = () => setOpen(false);
 
     const columns = [
-        {field: 'smiles', headerName: 'Smiles', flex: 0.45, editable: true},
+        {
+            field: 'smiles',
+            headerName: 'Smiles',
+            flex: 0.45,
+            editable: true,
+            preProcessEditCellProps: (params) => {
+                if (params.hasChanged) {
+                    const newRow = {...params.row, "predicted_parents": [], "direct_parents": [], "isNew": false, "smiles": params.props.value}
+                    setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
+                }
+                return { ...params.props,};
+            },
+        },
         {field: 'direct_parents', headerName: 'Predicted Class', flex: 0.45, editable: false, renderCell:renderClasses},
         {
             field: 'actions',
