@@ -2,7 +2,7 @@ import torch.cuda
 from flask_restful import Api, Resource, reqparse
 from chebai.models.electra import Electra
 from chebai.preprocessing.reader import ChemDataReader, EMBEDDING_OFFSET
-from chebai.preprocessing.collate import RaggedCollater
+from chebai.preprocessing.collate import RaggedCollator
 from chebai.result.molplot import AttentionMolPlot, AttentionNetwork
 from tempfile import NamedTemporaryFile
 from PIL import Image
@@ -17,6 +17,11 @@ import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import torch
+
+from chemlog.solving_strategies.strategy import IsA
+from chemlog.preprocessing.peptide_reader import PeptideCountMinAARReader
+from chemlog.solving_strategies.peptide_chunk_strategy import PeptideChunkStrategy
+
 mpl.use("Agg")
 
 if torch.cuda.is_available():
@@ -42,7 +47,7 @@ else:
 
 
 PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
-LABEL_HIERARCHY = json.load(open(app.config["CHEBI_JSON"]))
+LABEL_HIERARCHY = json.load(open(app.config["CHEBI_JSON"], encoding="utf-8"))
 
 def load_sub_ontology():
     g = nx.DiGraph()
@@ -52,11 +57,14 @@ def load_sub_ontology():
 
 CHEBI_FRAGMENT = load_sub_ontology()
 
+if __name__ == "__main__":
+    print(CHEBI_FRAGMENT)
+
 
 def get_relevant_chebi_fragment(predictions, smiles, labels=None):
     fragment_graph = CHEBI_FRAGMENT.copy()
-    predicted_subsumtions = [(i, h) for i in range(predictions.shape[0]) for h, p in zip(PREDICTION_HEADERS, predictions[i].tolist()) if p >= 0]
-    fragment_graph.add_edges_from(predicted_subsumtions)
+    predicted_subsumptions = [(i, h) for i in range(predictions.shape[0]) for h, p in zip(PREDICTION_HEADERS, predictions[i].tolist()) if p >= 0]
+    fragment_graph.add_edges_from(predicted_subsumptions)
     necessary_nodes = set()
     for i in range(predictions.shape[0]):
         fragment_graph.nodes[i]["lbl"] = labels[i] if labels else smiles[i]
@@ -66,8 +74,8 @@ def get_relevant_chebi_fragment(predictions, smiles, labels=None):
 
     # Copy node data to subgraph
     sub.add_nodes_from(d for d in fragment_graph.nodes(data=True) if d[0] in sub.nodes)
-    keys = set(i for i,_ in predicted_subsumtions)
-    return sub, {k: [l for j,l in predicted_subsumtions if j == k] for k in keys}
+    keys = set(i for i,_ in predicted_subsumptions)
+    return sub, {k: [l for j,l in predicted_subsumptions if j == k] for k in keys}
 
 def _build_node(ident, node, include_labels=True):
     d = dict(id=ident,
@@ -98,7 +106,7 @@ def batchify(l):
 
 
 def calculate_results(batch):
-    collater = RaggedCollater()
+    collater = RaggedCollator()
     dat = electra_model._process_batch(collater(batch).to(electra_model.device), 0)
     dat["features"] = dat["features"].int()
     return electra_model(dat, **dat["model_kwargs"])
@@ -107,6 +115,99 @@ def calculate_results(batch):
 class HierarchyAPI(Resource):
     def get(self):
         return {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses",[])) for r in LABEL_HIERARCHY}
+
+PEPTIDE_CLASSIFIER = IsA(limit_to_superclasses=None, available_strategies=[
+    PeptideChunkStrategy(reader=PeptideCountMinAARReader(only_one_aar_per_chunk=True), use_running_allocations=False)
+])
+
+def predict_single_peptide(mol, cls):
+    outcome = PEPTIDE_CLASSIFIER(mol, cls)
+    return outcome in [0, 4]
+def predict_peptides(smiles_list):
+    superclasses = [16670, 25676, 46761, 47923]
+    all_preds, all_direct = [], []
+    for i, smiles in enumerate(smiles_list):
+        mol = Chem.MolFromSmiles(smiles, sanitize=False)
+        if mol is None:
+            all_preds.append(None)
+            all_direct.append(None)
+            continue
+        mol.UpdatePropertyCache()
+        preds = []
+        preds_direct = []
+
+        # peptide zwitterion
+        if predict_single_peptide(mol, 60466):
+            preds.append(60466)
+            if predict_single_peptide(mol, 90799):
+                preds.append(90799)
+                preds_direct.append(90799)
+            elif predict_single_peptide(mol, 155837):
+                preds.append(155837)
+                preds_direct.append(155837)
+            else:
+                preds_direct.append(60466)
+        # peptide anion
+        elif predict_single_peptide(mol, 60194):
+            preds.append(60194)
+            preds_direct.append(60194)
+        # peptide cation
+        elif predict_single_peptide(mol, 60334):
+            preds.append(60334)
+            preds_direct.append(60334)
+        # peptide
+        elif predict_single_peptide(mol, 16670):
+            preds.append(16670)
+            # oligo
+            if predict_single_peptide(mol, 25676):
+                preds.append(25676)
+                # di
+                if predict_single_peptide(mol, 46761):
+                    preds.append(46761)
+                    # 2,5-diketopiperazines
+                    if predict_single_peptide(mol, 65061):
+                        preds.append(65061)
+                    else:
+                        preds_direct.append(46761)
+                # tri
+                if predict_single_peptide(mol, 47923):
+                    preds.append(47923)
+                    preds_direct.append(47923)
+                # tetra
+                elif predict_single_peptide(mol, 48030):
+                    preds.append(48030)
+                    preds_direct.append(48030)
+                # penta
+                elif predict_single_peptide(mol, 48545):
+                    preds.append(48545)
+                else:
+                    preds_direct.append(25676)
+            else:
+                # poly
+                preds.append(15841)
+                preds_direct.append(15841)
+        # depsipeptide
+        if predict_single_peptide(mol, 23643):
+            preds.append(23643)
+
+        # emericellamide depends on depsi and penta
+        if 23643 in preds and 48545 in preds:
+            # emericellamide
+            if predict_single_peptide(mol, 64372):
+                preds.append(64372)
+                preds_direct.append(64372)
+            else:
+                preds_direct.append(23643)
+                preds_direct.append(64372)
+        elif 23643 in preds:
+            preds_direct.append(23643)
+        elif 48545 in preds:
+            preds_direct.append(48545)
+
+        all_direct.append(preds_direct)
+        all_preds.append(preds)
+
+    return all_direct, all_preds
 
 
 class BatchPrediction(Resource):
@@ -136,7 +237,6 @@ class BatchPrediction(Resource):
         generate_ontology = args["ontology"]
 
         reader = ChemDataReader()
-        collater = RaggedCollater()
         token_dicts = []
         could_not_parse = []
         index_map = dict()
@@ -167,10 +267,12 @@ class BatchPrediction(Resource):
         else:
             chebi, predicted_parents = ([], [])
 
+        direct_predicted_parents_chemlog, predicted_parents_chemlog = predict_peptides(smiles)
         result = {
             "predicted_parents": [(None if i in could_not_parse else predicted_parents[index_map[i]]) for i in range(len(smiles))],
             "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))],
-
+            "predicted_parents_chemlog": [[f"CHEBI:{id}" for id in pp] if pp is not None else pp for pp in predicted_parents_chemlog],
+            "direct_parents_chemlog": [[f"CHEBI:{id}" for id in pp] if pp is not None else pp for pp in direct_predicted_parents_chemlog],
         }
 
         if generate_ontology:
@@ -255,7 +357,7 @@ class PredictionDetailApiHandler(Resource):
 
         chebi, predicted_parents = get_relevant_chebi_fragment(result["logits"].detach().cpu().numpy(), [smiles])
 
-        with NamedTemporaryFile(mode="wt", suffix=".png") as svg1:
+        with open("image.png", mode="wt") as svg1:
             rdmol = Chem.MolFromSmiles(smiles)
             d = rdMolDraw2D.MolDraw2DCairo(500, 500)
             rdMolDraw2D.PrepareAndDrawMolecule(d, rdmol)

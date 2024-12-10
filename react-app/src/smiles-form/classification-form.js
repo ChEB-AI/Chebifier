@@ -79,7 +79,7 @@ function EditToolbar(props) {
 
     const addRows = ((smiles) => {
             const ids = smiles.map((s) => randomId());
-            setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id: ids[i], smiles: s, direct_parents: [], predicted_parents: []}))]);
+            setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id: ids[i], smiles: s, direct_parents_chemlog: [], predicted_parents_chemlog: [], direct_parents: [], predicted_parents: []}))]);
             return ids
         }
     )
@@ -103,7 +103,8 @@ function EditToolbar(props) {
 
     const handleDownload = (event) => {
         event.preventDefault();
-        const fileData = JSON.stringify(rows.map((r) => ({"smiles": r["smiles"], "direct_parents": r["direct_parents"],"predicted_parents": r["predicted_parents"],})).filter((d) => d.direct_parents?.length >= 0));
+        const fileData = JSON.stringify(rows.map((r) => ({"smiles": r["smiles"], "direct_parents_electra": r["direct_parents"],
+        "predicted_parents_electra": r["predicted_parents"], "direct_parents_chemlog": r["direct_parents_chemlog"], "predicted_parents_chemlog": r["predicted_parents_chemlog"],})).filter((d) => d.direct_parents?.length >= 0));
         const blob = new Blob([fileData], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -119,7 +120,10 @@ function EditToolbar(props) {
             data: {smiles: rows.map((r) => (r["smiles"])), ontology: true}
         }).then(response => {
             setRows((oldRows) => oldRows.map((row, i) => ({
-                ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i],
+                ...row, "direct_parents": response.data.direct_parents[i],
+                "predicted_parents": response.data.predicted_parents[i],
+                "direct_parents_chemlog": response.data.direct_parents_chemlog[i],
+                "predicted_parents_chemlog": response.data.predicted_parents_chemlog[i]
             })));
             setOntology(response.data.ontology)
         });
@@ -174,6 +178,8 @@ export default function ClassificationGrid() {
         if (oldRow.smiles != newRow.smiles) {
             newRow.predicted_parents = [];
             newRow.direct_parents = [];
+            newRow.predicted_parents_chemlog = [];
+            newRow.direct_parents_chemlog = [];
             newRow.isNew = false;
         }
         setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
@@ -181,6 +187,7 @@ export default function ClassificationGrid() {
     };
 
     const renderClasses = (params) => {
+    	console.log("Called renderClasses with params: ", params);
         const data = params.value;
         if (data == null){
           return  <Alert severity="error">Could not process input!</Alert>
@@ -210,17 +217,19 @@ export default function ClassificationGrid() {
         {
             field: 'smiles',
             headerName: 'Smiles',
-            flex: 0.45,
+            flex: 0.4,
             editable: true,
             preProcessEditCellProps: (params) => {
                 if (params.hasChanged) {
-                    const newRow = {...params.row, "predicted_parents": [], "direct_parents": [], "isNew": false, "smiles": params.props.value}
+                    const newRow = {...params.row, "predicted_parents": [], "direct_parents": [],
+                    "predicted_parents_chemlog": [], "direct_parents_chemlog": [], "isNew": false, "smiles": params.props.value}
                     setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
                 }
                 return { ...params.props,};
             },
         },
-        {field: 'direct_parents', headerName: 'Predicted Class', flex: 0.45, editable: false, renderCell:renderClasses},
+        {field: 'direct_parents', headerName: 'Predicted Classes (Electra)', flex: 0.25, editable: false, renderCell:renderClasses},
+        {field: 'direct_parents_chemlog', headerName: 'Predicted Classes (Chemlog)', flex: 0.25, editable: false, renderCell:renderClasses},
         {
             field: 'actions',
             type: 'actions',
