@@ -19,7 +19,7 @@ and change the path for each setting according to your setup.
  * ELECTRA_CHECKPOINT : Path to a chebai-electra checkpoint,
  * BATCH_SIZE: Number of molecules that are passed to the model at once,
  * CLASS_HEADERS: Mapping of prediction labels to ChEBI classes,
- * CHEBI_JSON: Hierarchy of labels defined in `CLASS_HEADERS` (this file can be generate with [robot export](http://robot.obolibrary.org/export) using `--input chebi.obo` and ``--header ID|LABEL|SubClasses|``)
+ * CHEBI_JSON: Hierarchy of labels defined in `CLASS_HEADERS` (this file can be generate with [robot export](http://robot.obolibrary.org/export) using the options `--header "ID|LABEL|SubClasses" --entity-format ID`)
 
 
 
