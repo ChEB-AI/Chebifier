@@ -27,6 +27,26 @@ import {styled} from '@mui/material/styles';
 
 import {plot_ontology} from "./ontology-utils";
 
+
+const GLOBAL_MOL_PARAMS = {
+	width: 500,
+	height: 500,
+}
+window
+      .initRDKitModule()
+      .then(function (RDKit) {
+        console.log("RDKit version: " + RDKit.version());
+        window.RDKit = RDKit;
+        /**
+         * The RDKit module is now loaded.
+         * You can use it anywhere.
+         */
+      })
+      .catch(() => {
+        // handle loading errors here...
+      });
+
+
 const NetworkElement = (data) => {
     const visJsRef = useRef(null);
     useEffect(() => {
@@ -60,36 +80,79 @@ const LayerComponent = (data) => {
             <TabContext value={value}>
                 <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
                     <TabList onChange={handleChange} aria-label="lab API tabs example">
-                        {data.layer.map((layer, i) => <Tab label={"Head " + (i + 1)} value={i}/>)}
+                        {data.layer.highlights.map((highlight, i) => <Tab label={data.layer.name + " " + (i + 1)} value={i}/>)}
                     </TabList>
                 </Box>
-                {data.layer.map((g, i) => <TabPanel value={i}>< NetworkElement graph={g} /></TabPanel>)}
+                {data.layer.highlights.map((g, i) => <TabPanel value={i}><div className="svg-mol" dangerouslySetInnerHTML={{__html: data.mol.get_svg_with_highlights(JSON.stringify({...GLOBAL_MOL_PARAMS, 'atoms': g}))}}></div></TabPanel>)}
             </TabContext>
         </Box>
     );
 }
 
 
-export function LayerTabs(layers) {
+export function LayerTabs(data) {
     const [value, setValue] = React.useState(0);
     const handleChange = (event, newValue) => {
         setValue(newValue);
     };
-    console.log(layers)
-    console.log(layers.layers)
 
     return (
         <Box sx={{width: '100%', typography: 'body1'}}>
             <TabContext value={value}>
                 <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
                     <TabList onChange={handleChange} aria-label="lab API tabs example">
-                        {layers.layers.map((layer, i) => <Tab label={"Layer " + (i + 1)} value={i} centered/>)}
+                        {data.layers.map((layer, i) => <Tab label={layer.name} value={i} centered/>)}
                     </TabList>
                 </Box>
-                {layers.layers.map((layer, i) => <TabPanel value={i}><LayerComponent layer={layer}/></TabPanel>)}
+                {data.layers.map((layer, i) => <TabPanel value={i}><LayerComponent mol={data.mol} layer={layer}/></TabPanel>)}
             </TabContext>
         </Box>
     );
+}
+
+
+export function HighlightsBlocks(data) {
+	const [value, setValue] = React.useState(0);
+    const handleChange = (event, newValue) => {
+        setValue(newValue);
+    };
+
+    var blocks = data.highlights;
+    var blocks_content = [];
+    for (let i = 0; i < blocks.length; i++) {
+    	var block_type = blocks[i][0];
+    	var block_content = blocks[i][1];
+    	console.log(block_type)
+    	console.log(block_content)
+    	if (block_type == "text") {
+			blocks_content.push(
+				<Box>
+					<Typography>{block_content}</Typography>
+				</Box>
+			);
+		} else if (block_type == "single") {
+			var mdetails = {...GLOBAL_MOL_PARAMS};
+			mdetails["atoms"] = block_content;
+			var svg_mol = data.mol.get_svg_with_highlights(JSON.stringify(mdetails));
+			blocks_content.push(
+				<Box>
+					<div className="svg-mol" dangerouslySetInnerHTML={{__html: svg_mol}}></div>
+				</Box>
+			);
+
+		} else if (block_type == "tabs") {
+			var layers = [];
+			for (const[key, value] of Object.entries(block_content)) {
+				layers.push({name: key, highlights: value});
+			}
+			console.log(layers)
+			blocks_content.push(
+				<LayerTabs layers={layers} mol={data.mol}/>
+			);
+		}
+	}
+	return blocks_content;
+
 }
 
 const Item = styled(Paper)(({theme}) => ({
@@ -103,6 +166,12 @@ const Item = styled(Paper)(({theme}) => ({
 export default function DetailsPage(data) {
     const handleClose = data.handleClose;
     data = data.detail;
+    console.log(data)
+
+    var smiles = data.smiles
+  	var mol = window.RDKit.get_mol(smiles);
+  	var svg_mol = mol.get_svg_with_highlights(JSON.stringify(GLOBAL_MOL_PARAMS));
+  	svg_mol = svg_mol.substring(svg_mol.indexOf("<svg"));
 
     return (
         <Box sx={{ height: '100%'}}>
@@ -124,34 +193,16 @@ export default function DetailsPage(data) {
                         <Box sx={{ height: '100%'}}>
                             <Box>
                                 <Typography><h2>Molecular structure</h2></Typography>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}>
-                                <img src={`data:image/jpeg;base64,${data.plain_molecule}`} width="300" height="300"/></div>
+								<Box>
+									<div className="svg-mol" dangerouslySetInnerHTML={{__html: svg_mol}}></div>
+								</Box>
                             </Box>
+
                             <Box>
-                                <Typography><h2>ChEBI Classification</h2></Typography>
+                                <Typography><h2>ChemLog Classification</h2></Typography>
                                 <Typography><h3>What am I seeing?</h3>
-                                    The graph below shows you the position in the ChEBI ontology that our system
-                                    proposed. Not that this prediction is an estimate based on available data and may be
-                                    prone to errors.</Typography>
-                                <Box>
-                                    {plot_ontology(data.chebi)}
-                                </Box>
-                            </Box>
-                            <Box>
-                                <Typography><h2>Attention</h2></Typography>
-                                <Typography><h3>What am I seeing?</h3>
-                                    The model iterates over all parts of the molecule. For each of this parts, the
-                                    system is distributing its attention over all parts of the molecule. E.g. if an
-                                    opening parenthesis is encountered, the system may try to identify the closing
-                                    counterpart. The parts of the molecule that the system is paying attention to, are
-                                    indicated by lines. Darker shades indicate stronger attention.</Typography>
-                                <Box sx={{height: "400px"}}>
-                                    <LayerTabs layers={data.graphs}/>
-                                </Box>
+                                    Highlights!</Typography>
+                                <HighlightsBlocks highlights={data.highlights} mol={mol}/>
                             </Box>
                         </Box>
                     </Box>

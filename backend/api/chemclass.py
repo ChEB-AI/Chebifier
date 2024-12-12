@@ -17,10 +17,7 @@ import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import torch
-
-from chemlog.solving_strategies.strategy import IsA
-from chemlog.preprocessing.peptide_reader import PeptideCountMinAARReader
-from chemlog.solving_strategies.peptide_chunk_strategy import PeptideChunkStrategy
+from api.chemlog_api import predict_peptides
 
 mpl.use("Agg")
 
@@ -115,99 +112,6 @@ def calculate_results(batch):
 class HierarchyAPI(Resource):
     def get(self):
         return {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses",[])) for r in LABEL_HIERARCHY}
-
-PEPTIDE_CLASSIFIER = IsA(limit_to_superclasses=None, available_strategies=[
-    PeptideChunkStrategy(reader=PeptideCountMinAARReader(only_one_aar_per_chunk=True), use_running_allocations=False)
-])
-
-def predict_single_peptide(mol, cls):
-    outcome = PEPTIDE_CLASSIFIER(mol, cls)
-    return outcome in [0, 4]
-def predict_peptides(smiles_list):
-    superclasses = [16670, 25676, 46761, 47923]
-    all_preds, all_direct = [], []
-    for i, smiles in enumerate(smiles_list):
-        mol = Chem.MolFromSmiles(smiles, sanitize=False)
-        if mol is None:
-            all_preds.append(None)
-            all_direct.append(None)
-            continue
-        mol.UpdatePropertyCache()
-        preds = []
-        preds_direct = []
-
-        # peptide zwitterion
-        if predict_single_peptide(mol, 60466):
-            preds.append(60466)
-            if predict_single_peptide(mol, 90799):
-                preds.append(90799)
-                preds_direct.append(90799)
-            elif predict_single_peptide(mol, 155837):
-                preds.append(155837)
-                preds_direct.append(155837)
-            else:
-                preds_direct.append(60466)
-        # peptide anion
-        elif predict_single_peptide(mol, 60194):
-            preds.append(60194)
-            preds_direct.append(60194)
-        # peptide cation
-        elif predict_single_peptide(mol, 60334):
-            preds.append(60334)
-            preds_direct.append(60334)
-        # peptide
-        elif predict_single_peptide(mol, 16670):
-            preds.append(16670)
-            # oligo
-            if predict_single_peptide(mol, 25676):
-                preds.append(25676)
-                # di
-                if predict_single_peptide(mol, 46761):
-                    preds.append(46761)
-                    # 2,5-diketopiperazines
-                    if predict_single_peptide(mol, 65061):
-                        preds.append(65061)
-                    else:
-                        preds_direct.append(46761)
-                # tri
-                if predict_single_peptide(mol, 47923):
-                    preds.append(47923)
-                    preds_direct.append(47923)
-                # tetra
-                elif predict_single_peptide(mol, 48030):
-                    preds.append(48030)
-                    preds_direct.append(48030)
-                # penta
-                elif predict_single_peptide(mol, 48545):
-                    preds.append(48545)
-                else:
-                    preds_direct.append(25676)
-            else:
-                # poly
-                preds.append(15841)
-                preds_direct.append(15841)
-        # depsipeptide
-        if predict_single_peptide(mol, 23643):
-            preds.append(23643)
-
-        # emericellamide depends on depsi and penta
-        if 23643 in preds and 48545 in preds:
-            # emericellamide
-            if predict_single_peptide(mol, 64372):
-                preds.append(64372)
-                preds_direct.append(64372)
-            else:
-                preds_direct.append(23643)
-                preds_direct.append(64372)
-        elif 23643 in preds:
-            preds_direct.append(23643)
-        elif 48545 in preds:
-            preds_direct.append(48545)
-
-        all_direct.append(preds_direct)
-        all_preds.append(preds)
-
-    return all_direct, all_preds
 
 
 class BatchPrediction(Resource):
@@ -317,10 +221,6 @@ class PredictionDetailApiHandler(Resource):
                 if att[i, j] > threshold
             ],
         )
-
-
-
-
 
     def post(self):
         parser = reqparse.RequestParser()

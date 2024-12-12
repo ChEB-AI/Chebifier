@@ -32,6 +32,7 @@ import {
 } from '@mui/x-data-grid-generator';
 
 import DetailsPage from "./details-page";
+import DetailsPageChemlog from "./details-page-chemlog";
 import {plot_ontology} from "./ontology-utils";
 
 const RenderDate = (props) => {
@@ -159,6 +160,7 @@ export default function ClassificationGrid() {
     const [rows, setRows] = React.useState([]);
     const [rowModesModel, setRowModesModel] = React.useState({});
     const [detail, setDetail] = React.useState(null);
+    const [detailChemlog, setDetailChemlog] = React.useState(null);
     const [hierarchy, setHierarchy] = React.useState({});
 
     const [ontology, setOntology] = React.useState(null);
@@ -187,7 +189,6 @@ export default function ClassificationGrid() {
     };
 
     const renderClasses = (params) => {
-    	console.log("Called renderClasses with params: ", params);
         const data = params.value;
         if (data == null){
           return  <Alert severity="error">Could not process input!</Alert>
@@ -211,13 +212,27 @@ export default function ClassificationGrid() {
         });
 
     }
+    const [openChemlog, setOpenChemlog] = React.useState(false);
+    const handleOpenChemlog = (id) => () => {
+        const thisRow = rows.find((row) => row.id === id);
+        axios.post('/api/details-chemlog', {smiles: thisRow.smiles}).then(response => {
+            setDetailChemlog({
+                smiles: response.data.smiles,
+                highlights: response.data.highlights,
+            });
+            setOpenChemlog(true);
+        });
+
+    }
     const handleClose = () => setOpen(false);
+
+    const handleCloseChemlog = () => setOpenChemlog(false);
 
     const columns = [
         {
             field: 'smiles',
             headerName: 'Smiles',
-            flex: 0.4,
+            flex: 0.35,
             editable: true,
             preProcessEditCellProps: (params) => {
                 if (params.hasChanged) {
@@ -229,12 +244,11 @@ export default function ClassificationGrid() {
             },
         },
         {field: 'direct_parents', headerName: 'Predicted Classes (Electra)', flex: 0.25, editable: false, renderCell:renderClasses},
-        {field: 'direct_parents_chemlog', headerName: 'Predicted Classes (Chemlog)', flex: 0.25, editable: false, renderCell:renderClasses},
         {
-            field: 'actions',
+            field: 'actions_electra',
             type: 'actions',
             headerName: 'Actions',
-            flex: 0.1,
+            flex: 0.05,
             cellClassName: 'actions',
             getActions: ({id}) => {
                 const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
@@ -243,17 +257,40 @@ export default function ClassificationGrid() {
 
                 return [
                     <GridActionsCellItem
-                        icon={<DeleteIcon/>}
-                        label="Delete"
-                        onClick={handleDeleteClick(id)}
-                        color="inherit"
-                    />,
-                    <GridActionsCellItem
                         icon={<LightbulbIcon/>}
                         label="Details"
                         onClick={handleOpen(id)}
                         color="inherit"
                         disabled={!wasPredicted}
+                    />,
+                ];
+            },
+        },
+        {field: 'direct_parents_chemlog', headerName: 'Predicted Classes (Chemlog)', flex: 0.25, editable: false, renderCell:renderClasses},
+        {
+            field: 'actions_chemlog',
+            type: 'actions',
+            headerName: 'Actions',
+            flex: 0.1,
+            cellClassName: 'actions',
+            getActions: ({id}) => {
+                const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
+                const thisRow = rows.find((row) => row.id === id);
+                const wasPredicted = thisRow.direct_parents_chemlog?.length > 0;
+
+                return [
+                	<GridActionsCellItem
+                        icon={<LightbulbIcon/>}
+                        label="Details"
+                        onClick={handleOpenChemlog(id)}
+                        color="inherit"
+                        disabled={!wasPredicted}
+                    />,
+                    <GridActionsCellItem
+                        icon={<DeleteIcon/>}
+                        label="Delete"
+                        onClick={handleDeleteClick(id)}
+                        color="inherit"
                     />,
                 ];
             },
@@ -324,6 +361,27 @@ export default function ClassificationGrid() {
                 }}>
 
                     <DetailsPage detail={detail} handleClose={handleClose}/>
+                </Box>
+            </Modal>
+
+            <Modal
+              open={openChemlog}
+              onClose={handleCloseChemlog}
+              aria-labelledby="modal-modal-title"
+              aria-describedby="modal-modal-description"
+            >
+                <Box sx={{
+                  mb: 2,
+                  display: "flex",
+                  flexDirection: "column",
+                  width: '95%',
+                  height: '95%',
+                  position: 'fixed',
+                  left: '2.5%',
+                  top: '2.5%',
+                }}>
+
+                    <DetailsPageChemlog detail={detailChemlog} handleClose={handleCloseChemlog}/>
                 </Box>
             </Modal>
 

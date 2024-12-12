@@ -22,9 +22,11 @@ def serve(path):
 def load_endpoints():
     from api.chemclass import PredictionDetailApiHandler, BatchPrediction, \
         HierarchyAPI
+    from api.chemlog_api import PredictionDetailChemlog
     api.add_resource(PredictionDetailApiHandler, '/api/details')
     api.add_resource(BatchPrediction, '/api/classify')
     api.add_resource(HierarchyAPI, '/api/hierarchy')
+    api.add_resource(PredictionDetailChemlog, '/api/details-chemlog')
 
 
 with app.app_context():
