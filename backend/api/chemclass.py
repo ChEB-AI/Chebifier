@@ -18,6 +18,7 @@ from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import torch
 from api.chemlog_api import predict_peptides
+from api.chebi_utils import PREDICTION_HEADERS, LABEL_HIERARCHY, CHEBI_FRAGMENT
 
 mpl.use("Agg")
 
@@ -42,20 +43,6 @@ except ModuleNotFoundError:
 else:
     load_model = uwsgidecorators.postfork(load_model)
 
-
-PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
-LABEL_HIERARCHY = json.load(open(app.config["CHEBI_JSON"], encoding="utf-8"))
-
-def load_sub_ontology():
-    g = nx.DiGraph()
-    g.add_nodes_from([(c["ID"], dict(lbl=c["LABEL"][0])) for c in LABEL_HIERARCHY])
-    g.add_edges_from([(t, c["ID"]) for c in LABEL_HIERARCHY for t in c.get("SubClasses",[])])
-    return g
-
-CHEBI_FRAGMENT = load_sub_ontology()
-
-if __name__ == "__main__":
-    print(CHEBI_FRAGMENT)
 
 
 def get_relevant_chebi_fragment(predictions, smiles, labels=None):
@@ -171,12 +158,24 @@ class BatchPrediction(Resource):
         else:
             chebi, predicted_parents = ([], [])
 
-        direct_predicted_parents_chemlog, predicted_parents_chemlog = predict_peptides(smiles)
+        preds_chemlog = predict_peptides(smiles)
+        print(preds_chemlog)
+        direct_chemlog, predicted_chemlog = [], []
+        for pred_chemlog in preds_chemlog:
+            parents = [parent for parent, code in pred_chemlog.items() if code in [0, 4]]
+            direct_parents = [parent for parent in parents if not any(predecessor in parents for predecessor in CHEBI_FRAGMENT.predecessors(parent))]
+            predicted_chemlog.append(parents)
+            direct_chemlog.append(direct_parents)
+
+
+        print(direct_chemlog)
+
+        direct_chemlog = [["CHEBI:90799"]]
         result = {
             "predicted_parents": [(None if i in could_not_parse else predicted_parents[index_map[i]]) for i in range(len(smiles))],
             "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))],
-            "predicted_parents_chemlog": [[f"CHEBI:{id}" for id in pp] if pp is not None else pp for pp in predicted_parents_chemlog],
-            "direct_parents_chemlog": [[f"CHEBI:{id}" for id in pp] if pp is not None else pp for pp in direct_predicted_parents_chemlog],
+            "predicted_parents_chemlog": [[f"CHEBI:{id}" for id in pp] if pp is not None else pp for pp in predicted_chemlog],
+            "direct_parents_chemlog": [[f"CHEBI:{id}" for id in pp] if pp is not None else pp for pp in direct_chemlog],
         }
 
         if generate_ontology:

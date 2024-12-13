@@ -29,6 +29,6 @@ def load_endpoints():
     api.add_resource(PredictionDetailChemlog, '/api/details-chemlog')
 
 
-with app.app_context():
-    mp.set_start_method("spawn")
-    load_endpoints()
+#with app.app_context():
+    #mp.set_start_method("spawn")
+    #load_endpoints()
