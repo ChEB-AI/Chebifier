@@ -95,6 +95,7 @@ def calculate_results(batch):
     dat["features"] = dat["features"].int()
     return electra_model(dat, **dat["model_kwargs"])
 
+LABEL_HIERARCHY = json.load(open(app.config["CHEBI_JSON"], encoding="utf-8"))
 
 class HierarchyAPI(Resource):
     def get(self):
@@ -119,7 +120,6 @@ class BatchPrediction(Resource):
 
         If the system us unable to parse any smiles string, the respective entry in each list will be `None`.
         """
-
         parser = reqparse.RequestParser()
         parser.add_argument("smiles", type=str, action="append")
         parser.add_argument("ontology", type=bool, required=False, default=False)
@@ -159,7 +159,6 @@ class BatchPrediction(Resource):
             chebi, predicted_parents = ([], [])
 
         preds_chemlog = predict_peptides(smiles)
-        print(preds_chemlog)
         direct_chemlog, predicted_chemlog = [], []
         for pred_chemlog in preds_chemlog:
             parents = [parent for parent, code in pred_chemlog.items() if code in [0, 4]]
@@ -167,15 +166,11 @@ class BatchPrediction(Resource):
             predicted_chemlog.append(parents)
             direct_chemlog.append(direct_parents)
 
-
-        print(direct_chemlog)
-
-        direct_chemlog = [["CHEBI:90799"]]
         result = {
             "predicted_parents": [(None if i in could_not_parse else predicted_parents[index_map[i]]) for i in range(len(smiles))],
             "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))],
-            "predicted_parents_chemlog": [[f"CHEBI:{id}" for id in pp] if pp is not None else pp for pp in predicted_chemlog],
-            "direct_parents_chemlog": [[f"CHEBI:{id}" for id in pp] if pp is not None else pp for pp in direct_chemlog],
+            "predicted_parents_chemlog": [[id for id in pp] if pp is not None else pp for pp in predicted_chemlog],
+            "direct_parents_chemlog": [[id for id in pp] if pp is not None else pp for pp in direct_chemlog],
         }
 
         if generate_ontology:
