@@ -3,7 +3,6 @@ import json
 import networkx as nx
 
 
-PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
 LABEL_HIERARCHY = json.load(open(app.config["CHEBI_JSON"], encoding="utf-8"))
 
 def load_sub_ontology():

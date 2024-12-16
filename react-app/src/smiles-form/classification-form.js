@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useEffect } from 'react';
+import {Text} from 'react-native';
 import axios from "axios";
 import Alert from '@mui/material/Alert';
 import PropTypes from 'prop-types';
@@ -8,6 +9,7 @@ import Paper from '@mui/material/Paper';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
+import Switch from '@mui/material/Switch';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
@@ -20,6 +22,12 @@ import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
 import StartIcon from '@mui/icons-material/Start';
 import Modal from '@mui/material/Modal';
+import FormLabel from '@mui/material/FormLabel';
+import FormControl from '@mui/material/FormControl';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormHelperText from '@mui/material/FormHelperText';
+import Tooltip from '@mui/material/Tooltip';
 
 import {
     GridRowModes,
@@ -32,7 +40,6 @@ import {
 } from '@mui/x-data-grid-generator';
 
 import DetailsPage from "./details-page";
-import DetailsPageChemlog from "./details-page-chemlog";
 import {plot_ontology} from "./ontology-utils";
 
 const RenderDate = (props) => {
@@ -75,12 +82,21 @@ const RenderDate = (props) => {
   );
 };
 
+const Checkbox = ({label, value, onChange, checked=true}) => {
+	return (
+		<label key={value}>
+			<input type="checkbox" name={label} checked={checked} onChange={onChange} />
+			{label}
+		</label>
+	);
+};
+
 function EditToolbar(props) {
-    const {setRows, setRowModesModel, rows, getLabel, setOntology} = props;
+    const {setRows, setRowModesModel, rows, getLabel, setOntology, selectedModels} = props;
 
     const addRows = ((smiles) => {
             const ids = smiles.map((s) => randomId());
-            setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id: ids[i], smiles: s, direct_parents_chemlog: [], predicted_parents_chemlog: [], direct_parents: [], predicted_parents: []}))]);
+            setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id: ids[i], smiles: s, direct_parents: [], predicted_parents: []}))]);
             return ids
         }
     )
@@ -104,8 +120,7 @@ function EditToolbar(props) {
 
     const handleDownload = (event) => {
         event.preventDefault();
-        const fileData = JSON.stringify(rows.map((r) => ({"smiles": r["smiles"], "direct_parents_electra": r["direct_parents"],
-        "predicted_parents_electra": r["predicted_parents"], "direct_parents_chemlog": r["direct_parents_chemlog"], "predicted_parents_chemlog": r["predicted_parents_chemlog"],})).filter((d) => d.direct_parents?.length >= 0));
+        const fileData = JSON.stringify(rows.map((r) => ({"smiles": r["smiles"], "direct_parents": r["direct_parents"],"predicted_parents": r["predicted_parents"],})).filter((d) => d.direct_parents?.length >= 0));
         const blob = new Blob([fileData], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -118,13 +133,14 @@ function EditToolbar(props) {
         axios({
             url: '/api/classify',
             method: 'post',
-            data: {smiles: rows.map((r) => (r["smiles"])), ontology: true}
+            data: {
+            	smiles: rows.map((r) => (r["smiles"])),
+            	ontology: true,
+            	selectedModels: selectedModels
+            }
         }).then(response => {
             setRows((oldRows) => oldRows.map((row, i) => ({
-                ...row, "direct_parents": response.data.direct_parents[i],
-                "predicted_parents": response.data.predicted_parents[i],
-                "direct_parents_chemlog": response.data.direct_parents_chemlog[i],
-                "predicted_parents_chemlog": response.data.predicted_parents_chemlog[i]
+                ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i],
             })));
             setOntology(response.data.ontology)
         });
@@ -160,14 +176,30 @@ export default function ClassificationGrid() {
     const [rows, setRows] = React.useState([]);
     const [rowModesModel, setRowModesModel] = React.useState({});
     const [detail, setDetail] = React.useState(null);
-    const [detailChemlog, setDetailChemlog] = React.useState(null);
     const [hierarchy, setHierarchy] = React.useState({});
 
     const [ontology, setOntology] = React.useState(null);
 
+    const [availableModels, setAvailableModels] = React.useState([]);
+	const [availableModelsInfoTexts, setAvailableModelsInfoTexts] = React.useState([]);
+    const [selectedModels, setSelectedModels] = React.useState({});
+
+
+
     if (Object.keys(hierarchy).length === 0) {
         axios.get('/api/hierarchy').then(response => {
-            setHierarchy(response.data);
+        	console.log("Getting hierarchy");
+            setHierarchy(response.data.hierarchy);
+            setAvailableModels(response.data.available_models);
+            setAvailableModelsInfoTexts(response.data.available_models_info_texts);
+           	var newSelectedModels = {};
+           	for (var i = 0; i < response.data.available_models.length; i++) {
+           		newSelectedModels[response.data.available_models[i]] = true;
+           	}
+			setSelectedModels(newSelectedModels);
+			console.log("new selected models", newSelectedModels);
+
+
         });
     }
 
@@ -180,8 +212,6 @@ export default function ClassificationGrid() {
         if (oldRow.smiles != newRow.smiles) {
             newRow.predicted_parents = [];
             newRow.direct_parents = [];
-            newRow.predicted_parents_chemlog = [];
-            newRow.direct_parents_chemlog = [];
             newRow.isNew = false;
         }
         setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
@@ -212,63 +242,47 @@ export default function ClassificationGrid() {
         });
 
     }
-    const [openChemlog, setOpenChemlog] = React.useState(false);
-    const handleOpenChemlog = (id) => () => {
-        const thisRow = rows.find((row) => row.id === id);
-        axios.post('/api/details-chemlog', {smiles: thisRow.smiles}).then(response => {
-            setDetailChemlog({
-                smiles: response.data.smiles,
-                highlights: response.data.highlights,
-            });
-            setOpenChemlog(true);
-        });
-
-    }
     const handleClose = () => setOpen(false);
 
-    const handleCloseChemlog = () => setOpenChemlog(false);
+    const handleCheckboxChange= (event) => {
+    	const checkedModel = event.target.name;
+    	setSelectedModels({...selectedModels, [checkedModel]: event.target.checked});
+	};
+
+	const modelList = availableModels.map((model,index) => (
+		<>
+			<Tooltip title={availableModelsInfoTexts[index]} placement="bottom-start" arrow>
+			<FormControlLabel
+				control={<Switch checked={selectedModels[model]} onChange={handleCheckboxChange} name={model} />}
+				label={model}
+			/>
+			</Tooltip>
+		</>
+		//<Text>
+        //   <Checkbox label={model} value={model} checked={selectedModels[model]} onChange={(event) => { handleCheckboxChange(event) }} />
+        //   <br />
+        //</Text>
+    ));
+
+
 
     const columns = [
         {
             field: 'smiles',
             headerName: 'Smiles',
-            flex: 0.35,
+            flex: 0.45,
             editable: true,
             preProcessEditCellProps: (params) => {
                 if (params.hasChanged) {
-                    const newRow = {...params.row, "predicted_parents": [], "direct_parents": [],
-                    "predicted_parents_chemlog": [], "direct_parents_chemlog": [], "isNew": false, "smiles": params.props.value}
+                    const newRow = {...params.row, "predicted_parents": [], "direct_parents": [], "isNew": false, "smiles": params.props.value}
                     setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
                 }
                 return { ...params.props,};
             },
         },
-        {field: 'direct_parents', headerName: 'Predicted Classes (Electra)', flex: 0.25, editable: false, renderCell:renderClasses},
+        {field: 'direct_parents', headerName: 'Predicted Class', flex: 0.45, editable: false, renderCell:renderClasses},
         {
-            field: 'actions_electra',
-            type: 'actions',
-            headerName: 'Actions',
-            flex: 0.05,
-            cellClassName: 'actions',
-            getActions: ({id}) => {
-                const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
-                const thisRow = rows.find((row) => row.id === id);
-                const wasPredicted = thisRow.direct_parents?.length > 0;
-
-                return [
-                    <GridActionsCellItem
-                        icon={<LightbulbIcon/>}
-                        label="Details"
-                        onClick={handleOpen(id)}
-                        color="inherit"
-                        disabled={!wasPredicted}
-                    />,
-                ];
-            },
-        },
-        {field: 'direct_parents_chemlog', headerName: 'Predicted Classes (Chemlog)', flex: 0.25, editable: false, renderCell:renderClasses},
-        {
-            field: 'actions_chemlog',
+            field: 'actions',
             type: 'actions',
             headerName: 'Actions',
             flex: 0.1,
@@ -276,13 +290,13 @@ export default function ClassificationGrid() {
             getActions: ({id}) => {
                 const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
                 const thisRow = rows.find((row) => row.id === id);
-                const wasPredicted = thisRow.direct_parents_chemlog?.length > 0;
+                const wasPredicted = thisRow.direct_parents?.length > 0;
 
                 return [
                 	<GridActionsCellItem
                         icon={<LightbulbIcon/>}
                         label="Details"
-                        onClick={handleOpenChemlog(id)}
+                        onClick={handleOpen(id)}
                         color="inherit"
                         disabled={!wasPredicted}
                     />,
@@ -307,6 +321,7 @@ export default function ClassificationGrid() {
                 <h1>Chebifier</h1>
                 Classify chemical structures using AI.
             </Box>
+
             <Paper sx={{width: "100%"}}>
                 <Box
                     sx={{
@@ -320,6 +335,16 @@ export default function ClassificationGrid() {
                         },
                     }}
                 >
+					<Box>
+						<FormControl component="fieldset" variant="standard">
+							<FormLabel component="legend">Select models:</FormLabel>
+							<FormGroup>
+						{modelList}
+							</FormGroup>
+						</FormControl>
+
+					</Box>
+
                     <DataGrid
                         rows={rows}
                         columns={columns}
@@ -332,10 +357,11 @@ export default function ClassificationGrid() {
                             Toolbar: EditToolbar,
                         }}
                         componentsProps={{
-                            toolbar: {setRows, setRowModesModel, rows, getLabel, setOntology},
+                            toolbar: {setRows, setRowModesModel, rows, getLabel, setOntology, selectedModels},
                         }}
                         experimentalFeatures={{newEditingApi: true}}
                     />
+
                 </Box>
             </Paper>
 
@@ -361,27 +387,6 @@ export default function ClassificationGrid() {
                 }}>
 
                     <DetailsPage detail={detail} handleClose={handleClose}/>
-                </Box>
-            </Modal>
-
-            <Modal
-              open={openChemlog}
-              onClose={handleCloseChemlog}
-              aria-labelledby="modal-modal-title"
-              aria-describedby="modal-modal-description"
-            >
-                <Box sx={{
-                  mb: 2,
-                  display: "flex",
-                  flexDirection: "column",
-                  width: '95%',
-                  height: '95%',
-                  position: 'fixed',
-                  left: '2.5%',
-                  top: '2.5%',
-                }}>
-
-                    <DetailsPageChemlog detail={detailChemlog} handleClose={handleCloseChemlog}/>
                 </Box>
             </Modal>
 
