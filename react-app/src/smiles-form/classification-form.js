@@ -28,6 +28,7 @@ import FormGroup from '@mui/material/FormGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormHelperText from '@mui/material/FormHelperText';
 import Tooltip from '@mui/material/Tooltip';
+import Link from '@mui/material/Link';
 
 import {
     GridRowModes,
@@ -368,6 +369,16 @@ export default function ClassificationGrid() {
             <Paper>
                 {plot_ontology(ontology,true,false)}
             </Paper>
+
+            <Paper>
+            	<Text>
+					<b>References:</b><br />
+					[1] Glauer, Martin, et al.: Chebifier: Automating Semantic Classification in ChEBI to Accelerate
+					Data-driven Discovery; Digital Discovery 3.5 (2024), <Link href="https://doi.org/10.1039/D3DD00238A">Link</Link>
+					<br />
+					[2] (preprint): ChemLog
+				</Text>
+      		</Paper>
 
             <Modal
               open={open}
