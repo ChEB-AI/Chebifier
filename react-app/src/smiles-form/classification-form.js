@@ -92,6 +92,8 @@ const Checkbox = ({label, value, onChange, checked=true}) => {
 	);
 };
 
+
+
 function EditToolbar(props) {
     const {setRows, setRowModesModel, rows, getLabel, setOntology, selectedModels} = props;
 
@@ -237,7 +239,8 @@ export default function ClassificationGrid() {
             setDetail({
                 plain_molecule: response.data.figures.plain_molecule,
                 graphs: response.data.graphs,
-                chebi: response.data.classification
+                chebi: response.data.classification,
+                chebi_legend: response.data.color_legend
             });
             setOpen(true);
         });
@@ -259,11 +262,9 @@ export default function ClassificationGrid() {
 			/>
 			</Tooltip>
 		</>
-		//<Text>
-        //   <Checkbox label={model} value={model} checked={selectedModels[model]} onChange={(event) => { handleCheckboxChange(event) }} />
-        //   <br />
-        //</Text>
+
     ));
+
 
 
 

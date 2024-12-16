@@ -40,11 +40,17 @@ def _build_node(ident, node, include_labels=True):
     return d
 
 
-def nx_to_graph(g: nx.Graph):
-    return dict(
-        nodes={n: g.nodes[n] for n in g.nodes},
-        edges=list(g.edges)
-    )
+def nx_to_graph(g: nx.Graph, colors=None):
+    results = {
+        "nodes": {n: g.nodes[n] for n in g.nodes},
+        "edges": list(g.edges)
+    }
+    if colors is not None:
+        results["node_colors"] = dict()
+        for node, color in colors.items():
+            if node in results["nodes"]:
+                results["node_colors"][node] = color
+    return results
 
 class HierarchyAPI(Resource):
     def get(self):
@@ -54,6 +60,20 @@ class HierarchyAPI(Resource):
             "hierarchy": {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses", [])) for r in LABEL_HIERARCHY}
         }
 
+
+def get_transitive_predictions(predicted_classes):
+    # get all parents of predicted classes
+    all_predicted = [cls for clss in predicted_classes for cls in clss]
+    q = queue.Queue()
+    for cls in all_predicted:
+        q.put(cls)
+    while not q.empty():
+        cls = q.get()
+        for parent in CHEBI_FRAGMENT.successors(cls):
+            if parent not in all_predicted:
+                all_predicted.append(parent)
+                q.put(parent)
+    return all_predicted
 
 class BatchPrediction(Resource):
     def post(self):
@@ -90,17 +110,7 @@ class BatchPrediction(Resource):
                     if new_preds[i] is not None:
                         predicted_classes[i] += new_preds[i]
 
-        # get all parents of predicted classes
-        all_predicted = [cls for clss in predicted_classes for cls in clss]
-        q = queue.Queue()
-        for cls in all_predicted:
-            q.put(cls)
-        while not q.empty():
-            cls = q.get()
-            for parent in CHEBI_FRAGMENT.successors(cls):
-                if parent not in all_predicted:
-                    all_predicted.append(parent)
-                    q.put(parent)
+        all_predicted = get_transitive_predictions(predicted_classes)
 
         # todo check for disjointness violations
 
@@ -120,6 +130,13 @@ class BatchPrediction(Resource):
         return result
 
 
+def to_color(model_name):
+    # turn any string into a color
+    import hashlib
+    h = hashlib.md5(model_name.encode()).hexdigest()
+    return "#" + h[:6]
+
+
 class PredictionDetailApiHandler(Resource):
 
     def load_image(self, path):
@@ -131,8 +148,6 @@ class PredictionDetailApiHandler(Resource):
 
     def post(self):
         parser = reqparse.RequestParser()
-        plotter = AttentionMolPlot()
-        network_plotter = AttentionNetwork()
         parser.add_argument("type", type=str)
         parser.add_argument("smiles", type=str)
 
@@ -144,13 +159,27 @@ class PredictionDetailApiHandler(Resource):
         smiles = args["smiles"]
 
         predicted_classes = []
+        predicted_by_model = {}
         explain_infos = {}
         for model in AVAILABLE_MODELS:
-            predicted_classes += model.predict([smiles])
+            predicted_classes += model.predict([smiles])[0]
+            predicted_by_model[model.name] = model.predict([smiles])[0]
             explain_infos.update(model.explain(smiles))
 
-        chebi = CHEBI_FRAGMENT.subgraph(predicted_classes)
+        all_predicted = get_transitive_predictions([predicted_classes])
+        chebi = CHEBI_FRAGMENT.subgraph(all_predicted)
 
+        predicted_by_per_node = {cls: [] for cls in all_predicted}
+        for model_name, nodes in predicted_by_model.items():
+            for node in nodes:
+                predicted_by_per_node[node].append(model_name)
+        node_colors = {node: to_color(str(predicted_by_per_node[node])) for node in all_predicted
+                       }
+        color_legend = {to_color(str(preds)): " and ".join(preds) if len(preds) > 0 else "Inferred based on predicted subclasses"
+                        for preds in predicted_by_per_node.values()}
+        print(color_legend)
+
+        # todo replace with smiles (and paint with rdkit-js)
         with open("image.png", mode="wt") as svg1:
             rdmol = Chem.MolFromSmiles(smiles)
             d = rdMolDraw2D.MolDraw2DCairo(500, 500)
@@ -160,8 +189,7 @@ class PredictionDetailApiHandler(Resource):
             mol_pic = self.load_image(svg1.name)
 
         explain_infos["figures"] = {"plain_molecule": mol_pic}
-        explain_infos["classification"] = nx_to_graph(chebi)
-
-        print("Prediction Detail Result: ", explain_infos)
+        explain_infos["classification"] = nx_to_graph(chebi, node_colors)
+        explain_infos["color_legend"] = color_legend
 
         return explain_infos

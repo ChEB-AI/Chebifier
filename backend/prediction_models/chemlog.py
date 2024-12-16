@@ -92,6 +92,7 @@ class ChemLog(PredictionModel):
         # todo check which amino acids actually form the peptide
         blocks.append(("text", "The following amino acids have been identified:"))
         blocks.append(("tabs", {"Amino acids": highlights["aars"]}))
+        # todo: fails for "Oc1ccc2C[C@@H]3NC(=O)[C@H](Cc4ccc(O)c(c4)-c1c2)NC3=O"
         if highlights["net_charge"] > 0:
             blocks.append(("text", "The molecule has a net positive charge, therefore it is a cation."))
             return blocks
