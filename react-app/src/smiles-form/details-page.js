@@ -27,6 +27,7 @@ import {styled} from '@mui/material/styles';
 
 import {plot_ontology} from "./ontology-utils";
 import {DetailsElectra} from "./details-electra";
+import {DetailsChemlog} from "./details-page-chemlog";
 
 
 
@@ -54,9 +55,31 @@ const Legend = ({ colors }) => {
 	);
 };
 
+export function DetailsPerModel(data) {
+	const models_info = data.models_info;
+	return (
+		<Box>
+			{Object.entries(models_info).map(([model_name, model_data]) => (
+				<Box>
+					<h2>Insights for {model_name}:</h2>
+					{model_data.model_type === "ELECTRA" ? (
+						<DetailsElectra model_data={model_data} />
+					) : model_data.model_type === "ChemLog" ? (
+						<DetailsChemlog model_data={model_data} />
+					) : (
+						<Typography>Model type {model_data.model_type} not supported for explanations.</Typography>
+					)}
+				</Box>
+			))
+			}
+		</Box>
+	);
+};
+
 export default function DetailsPage(data) {
     const handleClose = data.handleClose;
     data = data.detail;
+    console.log(data.models_info);
 
     return (
         <Box sx={{ height: '100%'}}>
@@ -97,7 +120,7 @@ export default function DetailsPage(data) {
                                     {plot_ontology(data.chebi)}
                                 </Box>
                             </Box>
-                            {DetailsElectra(data)}
+                            {DetailsPerModel(data)}
                         </Box>
                     </Box>
                 </Paper>

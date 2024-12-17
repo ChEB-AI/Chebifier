@@ -91,18 +91,22 @@ export function LayerTabs(layers) {
 
 
 export function DetailsElectra(data) {
-
-	return (<Box>
-                                <Typography><h2>Attention</h2></Typography>
-                                <Typography><h3>What am I seeing?</h3>
-                                    The model iterates over all parts of the molecule. For each of this parts, the
-                                    system is distributing its attention over all parts of the molecule. E.g. if an
-                                    opening parenthesis is encountered, the system may try to identify the closing
-                                    counterpart. The parts of the molecule that the system is paying attention to, are
-                                    indicated by lines. Darker shades indicate stronger attention.</Typography>
-                                <Box sx={{height: "400px"}}>
-                                    <LayerTabs layers={data.graphs}/>
-                                </Box>
-                            </Box>);
-
-                        }
+	data = data.model_data;
+	console.log(data);
+	return (
+		<Box>
+        	<Typography><h2>Attention</h2></Typography>
+            <Typography>
+            	<h3>What am I seeing?</h3>
+            	The model iterates over all parts of the molecule. For each of this parts, the
+                system is distributing its attention over all parts of the molecule. E.g. if an
+                opening parenthesis is encountered, the system may try to identify the closing
+                counterpart. The parts of the molecule that the system is paying attention to, are
+                indicated by lines. Darker shades indicate stronger attention.
+            </Typography>
+       		<Box sx={{height: "400px"}}>
+           		<LayerTabs layers={data.graphs}/>
+            </Box>
+        </Box>
+    );
+}

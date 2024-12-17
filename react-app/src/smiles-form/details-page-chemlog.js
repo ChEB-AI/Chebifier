@@ -29,8 +29,8 @@ import {plot_ontology} from "./ontology-utils";
 
 
 const GLOBAL_MOL_PARAMS = {
-	width: 500,
-	height: 500,
+	width: 300,
+	height: 300,
 }
 window
       .initRDKitModule()
@@ -122,8 +122,8 @@ export function HighlightsBlocks(data) {
     for (let i = 0; i < blocks.length; i++) {
     	var block_type = blocks[i][0];
     	var block_content = blocks[i][1];
-    	console.log(block_type)
-    	console.log(block_content)
+
+
     	if (block_type == "text") {
 			blocks_content.push(
 				<Box>
@@ -145,28 +145,28 @@ export function HighlightsBlocks(data) {
 			for (const[key, value] of Object.entries(block_content)) {
 				layers.push({name: key, highlights: value});
 			}
-			console.log(layers)
+
 			blocks_content.push(
 				<LayerTabs layers={layers} mol={data.mol}/>
 			);
+		} else if (block_type == "heading") {
+			blocks_content.push(
+				<Box>
+					<h3>{block_content}</h3>
+				</Box>
+			);
+		} else {
+			console.log("Unidentified block type:", block_type)
 		}
 	}
 	return blocks_content;
 
 }
 
-const Item = styled(Paper)(({theme}) => ({
-    backgroundColor: theme.palette.mode === 'dark' ? '#1A2027' : '#fff',
-    ...theme.typography.body2,
-    padding: theme.spacing(1),
-    textAlign: 'center',
-    color: theme.palette.textsecondary,
-}));
 
-export default function DetailsPage(data) {
+export function DetailsChemlog(data) {
     const handleClose = data.handleClose;
-    data = data.detail;
-    console.log(data)
+    data = data.model_data;
 
     var smiles = data.smiles
   	var mol = window.RDKit.get_mol(smiles);
@@ -174,41 +174,15 @@ export default function DetailsPage(data) {
   	svg_mol = svg_mol.substring(svg_mol.indexOf("<svg"));
 
     return (
-        <Box sx={{ height: '100%'}}>
-            <Box sx={{ height: '100%'}}>
-                <Paper sx={{ height: '100%'}}>
-                    <Button color="primary" onClick={handleClose} startIcon={<CancelIcon/>}/>
-                    <Box sx={{
-                        overflowX: "scroll",
-                        overflowY: "scroll",
-                        overflow: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        position: 'relative',
-                        width: '94%',
-                        height: '94%',
-                        top: '1%',
-                        left: '1%'
-                    }}>
-                        <Box sx={{ height: '100%'}}>
-                            <Box>
-                                <Typography><h2>Molecular structure</h2></Typography>
-								<Box>
-									<div className="svg-mol" dangerouslySetInnerHTML={{__html: svg_mol}}></div>
-								</Box>
-                            </Box>
-
-                            <Box>
-                                <Typography><h2>ChemLog Classification</h2></Typography>
-                                <Typography><h3>What am I seeing?</h3>
-                                    Highlights!</Typography>
-                                <HighlightsBlocks highlights={data.highlights} mol={mol}/>
-                            </Box>
-                        </Box>
-                    </Box>
-                </Paper>
-            </Box>
-        </Box>
+        <Box>
+			<Typography>
+				<h3>What am I seeing?</h3>
+				Results for peptides and peptide-related classes (e.g. peptide anion, depsipeptide) have been calculated
+				with a rule-based system. The following shows which parts of the molecule were identified as relevant
+				structures and have influenced the classification.
+			</Typography>
+			<HighlightsBlocks highlights={data.highlights} mol={mol}/>
+		</Box>
     )
 }
 

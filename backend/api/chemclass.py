@@ -1,21 +1,23 @@
+import os
 import queue
 import sys
 
 from flask_restful import Resource, reqparse
-from chebai.result.molplot import AttentionMolPlot, AttentionNetwork
-from prediction_models.electra_model import ElectraModel
-from prediction_models.chemlog import ChemLog
 from PIL import Image
 import base64
 import io
 from app import app
 import matplotlib as mpl
-import json
 import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import torch
 from chebi_utils import LABEL_HIERARCHY, CHEBI_FRAGMENT
+import hashlib
+
+# not used directly, but will be resolved by AVAILABLE_MODELS
+from prediction_models.electra_model import ElectraModel
+from prediction_models.chemlog_model import ChemLog
 
 mpl.use("Agg")
 
@@ -29,6 +31,7 @@ for model in app.config["MODELS"]:
     cls = getattr(sys.modules[__name__], model["class"])
     del model["class"]
     AVAILABLE_MODELS.append(cls(**model))
+
 
 def _build_node(ident, node, include_labels=True):
     d = dict(id=ident,
@@ -52,6 +55,7 @@ def nx_to_graph(g: nx.Graph, colors=None):
                 results["node_colors"][node] = color
     return results
 
+
 class HierarchyAPI(Resource):
     def get(self):
         return {
@@ -74,6 +78,25 @@ def get_transitive_predictions(predicted_classes):
                 all_predicted.append(parent)
                 q.put(parent)
     return all_predicted
+
+
+def verify_disjointness(predicted_classes):
+    disjoints = []
+    with open(os.path.join("data", "disjoint_chebi.csv")) as f:
+        for line in f:
+            disjoints.append([f"CHEBI:{i}" for i in line.strip().split(",")])
+    with open(os.path.join("data", "disjoint_additional.csv")) as f:
+        for line in f:
+            disjoints.append([f"CHEBI:{i}" for i in line.strip().split(",")])
+    violations = []
+    for sample in predicted_classes:
+        violations_sample = []
+        for disjoint in disjoints:
+            if all(cls in sample for cls in disjoint):
+                violations_sample.append(disjoint)
+        violations.append(violations_sample)
+    return violations
+
 
 class BatchPrediction(Resource):
     def post(self):
@@ -112,16 +135,26 @@ class BatchPrediction(Resource):
 
         all_predicted = get_transitive_predictions(predicted_classes)
 
-        # todo check for disjointness violations
-
         predicted_graph = CHEBI_FRAGMENT.subgraph(all_predicted)
         graphs_per_smiles = [CHEBI_FRAGMENT.subgraph(predicted) for predicted in predicted_classes]
 
+        direct_parents = [[cls for cls in graph.nodes if not any(predecessor in graph.nodes
+                                                                 for predecessor in graph.predecessors(cls))]
+                          for graph in graphs_per_smiles]
+
+        # array with dimensions [n_samples, n_violations, 2]
+        violations = verify_disjointness(predicted_classes)
+        print(violations)
+        # replace the violation-causing classes with the direct predictions that are influenced by them
+        violations = [[[direct_pred for direct_pred in direct_preds
+                       if any(direct_pred == v or nx.has_path(graph_smiles,direct_pred, v)
+                               for v in violation)] for violation in violations_sample]
+                      for violations_sample, direct_preds, graph_smiles in zip(violations, direct_parents, graphs_per_smiles)]
+        print(violations)
         result = {
             "predicted_parents": predicted_classes,
-            "direct_parents": [[cls for cls in graph.nodes if not any(predecessor in graph.nodes
-                                                                      for predecessor in graph.predecessors(cls))]
-                               for graph in graphs_per_smiles],
+            "direct_parents": direct_parents,
+            "violations": violations
         }
 
         if generate_ontology:
@@ -132,7 +165,6 @@ class BatchPrediction(Resource):
 
 def to_color(model_name):
     # turn any string into a color
-    import hashlib
     h = hashlib.md5(model_name.encode()).hexdigest()
     return "#" + h[:6]
 
@@ -160,11 +192,14 @@ class PredictionDetailApiHandler(Resource):
 
         predicted_classes = []
         predicted_by_model = {}
-        explain_infos = {}
+        explain_infos = {"models": {}}
         for model in AVAILABLE_MODELS:
+            explain_infos_model = model.explain(smiles)
+            explain_infos_model["model_type"] = model.default_name
+            explain_infos_model["model_info"] = model.info_text
             predicted_classes += model.predict([smiles])[0]
             predicted_by_model[model.name] = model.predict([smiles])[0]
-            explain_infos.update(model.explain(smiles))
+            explain_infos["models"][model.name] = explain_infos_model
 
         all_predicted = get_transitive_predictions([predicted_classes])
         chebi = CHEBI_FRAGMENT.subgraph(all_predicted)
@@ -175,9 +210,9 @@ class PredictionDetailApiHandler(Resource):
                 predicted_by_per_node[node].append(model_name)
         node_colors = {node: to_color(str(predicted_by_per_node[node])) for node in all_predicted
                        }
-        color_legend = {to_color(str(preds)): " and ".join(preds) if len(preds) > 0 else "Inferred based on predicted subclasses"
-                        for preds in predicted_by_per_node.values()}
-        print(color_legend)
+        color_legend = {
+            to_color(str(preds)): " and ".join(preds) if len(preds) > 0 else "Inferred based on predicted subclasses"
+            for preds in predicted_by_per_node.values()}
 
         # todo replace with smiles (and paint with rdkit-js)
         with open("image.png", mode="wt") as svg1:

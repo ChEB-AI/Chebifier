@@ -26,7 +26,6 @@ function buildNode(id, node, node_color=false, includeLabel=true){
         d["color"] = "#c4c4c0"
     }
     if (node_color != false) {
-    	console.log("setting color of node " + id + " to " + node_color);
     	d["color"] = node_color;
 	}
     return d

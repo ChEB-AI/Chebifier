@@ -238,7 +238,7 @@ export default function ClassificationGrid() {
         axios.post('/api/details', {smiles: thisRow.smiles}).then(response => {
             setDetail({
                 plain_molecule: response.data.figures.plain_molecule,
-                graphs: response.data.graphs,
+                models_info: response.data.models,
                 chebi: response.data.classification,
                 chebi_legend: response.data.color_legend
             });
