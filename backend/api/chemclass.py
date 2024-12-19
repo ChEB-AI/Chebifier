@@ -18,6 +18,7 @@ import hashlib
 # not used directly, but will be resolved by AVAILABLE_MODELS
 from prediction_models.electra_model import ElectraModel
 from prediction_models.chemlog_model import ChemLog
+from prediction_models.gnn_resgated_model import GNNResGated
 
 mpl.use("Agg")
 
@@ -29,8 +30,9 @@ else:
 AVAILABLE_MODELS = []
 for model in app.config["MODELS"]:
     cls = getattr(sys.modules[__name__], model["class"])
-    del model["class"]
-    AVAILABLE_MODELS.append(cls(**model))
+    model_args = model.copy()
+    del model_args["class"]
+    AVAILABLE_MODELS.append(cls(**model_args))
 
 
 def _build_node(ident, node, include_labels=True):
@@ -144,20 +146,19 @@ class BatchPrediction(Resource):
 
         # array with dimensions [n_samples, n_violations, 2]
         violations = verify_disjointness(predicted_classes)
-        print(violations)
         # replace the violation-causing classes with the direct predictions that are influenced by them
-        violations = [[[direct_pred for direct_pred in direct_preds
+        violations_direct = [[[direct_pred for direct_pred in direct_preds
                        if any(direct_pred == v or nx.has_path(graph_smiles,direct_pred, v)
                                for v in violation)] for violation in violations_sample]
                       for violations_sample, direct_preds, graph_smiles in zip(violations, direct_parents, graphs_per_smiles)]
-        print(violations)
         result = {
             "predicted_parents": predicted_classes,
             "direct_parents": direct_parents,
-            "violations": violations
+            "violations": violations_direct
         }
 
         if generate_ontology:
+            #violation_colors = {violator: "#d92946" for violations_sample in violations for violation in violations_sample for violator in violation}
             result["ontology"] = nx_to_graph(predicted_graph)
 
         return result
@@ -189,17 +190,22 @@ class PredictionDetailApiHandler(Resource):
 
         request_type = args["type"]
         smiles = args["smiles"]
+        selected_models = args["selectedModels"]
+
 
         predicted_classes = []
         predicted_by_model = {}
         explain_infos = {"models": {}}
         for model in AVAILABLE_MODELS:
-            explain_infos_model = model.explain(smiles)
-            explain_infos_model["model_type"] = model.default_name
-            explain_infos_model["model_info"] = model.info_text
-            predicted_classes += model.predict([smiles])[0]
-            predicted_by_model[model.name] = model.predict([smiles])[0]
-            explain_infos["models"][model.name] = explain_infos_model
+            if model.name in selected_models.keys() and selected_models[model.name]:
+                explain_infos_model = model.explain(smiles)
+                pred = model.predict([smiles])[0]
+                predicted_classes += pred
+                predicted_by_model[model.name] = pred
+                if explain_infos_model is not None:
+                    explain_infos_model["model_type"] = model.default_name
+                    explain_infos_model["model_info"] = model.info_text
+                    explain_infos["models"][model.name] = explain_infos_model
 
         all_predicted = get_transitive_predictions([predicted_classes])
         chebi = CHEBI_FRAGMENT.subgraph(all_predicted)
@@ -228,3 +234,10 @@ class PredictionDetailApiHandler(Resource):
         explain_infos["color_legend"] = color_legend
 
         return explain_infos
+
+
+if __name__ == "__main__":
+    gnn = AVAILABLE_MODELS[2]
+    print(gnn)
+    smiles = "CC(=O)Oc1ccccc1C(=O)O"
+    print(gnn.read_smiles(smiles))
