@@ -62,10 +62,11 @@ class GNNResGated(NNPredictionModel):
                 # cant use standard encode for index encoder because model has been trained on a certain range of values
                 # use default value if we meet an unseen value
                 if isinstance(property.encoder, IndexEncoder):
-                    if value in property.encoder.cache:
+                    if str(value) in property.encoder.cache:
                         index = property.encoder.cache.index(str(value)) + property.encoder.offset
                     else:
                         index = 0
+                        print(f"Unknown property value {value} for property {property} at smiles {smiles}")
                     if isinstance(property.encoder, OneHotEncoder):
                         encoded_values.append(torch.nn.functional.one_hot(
                             torch.tensor(index), num_classes=property.encoder.get_encoding_length()
@@ -75,7 +76,8 @@ class GNNResGated(NNPredictionModel):
 
                 else:
                     encoded_values.append(property.encoder.encode(value))
-            encoded_values = torch.stack(encoded_values)
+            if len(encoded_values) > 0:
+                encoded_values = torch.stack(encoded_values)
 
             if isinstance(encoded_values, torch.Tensor):
                 if len(encoded_values.size()) == 0:

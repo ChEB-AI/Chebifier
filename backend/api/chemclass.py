@@ -1,5 +1,4 @@
 import os
-import queue
 import sys
 
 from flask_restful import Resource, reqparse
@@ -12,7 +11,7 @@ import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import torch
-from chebi_utils import LABEL_HIERARCHY, CHEBI_FRAGMENT
+from chebi_utils import LABEL_HIERARCHY, CHEBI_FRAGMENT, get_transitive_predictions
 import hashlib
 
 # not used directly, but will be resolved by AVAILABLE_MODELS
@@ -65,21 +64,6 @@ class HierarchyAPI(Resource):
             "available_models_info_texts": [model.info_text for model in AVAILABLE_MODELS],
             "hierarchy": {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses", [])) for r in LABEL_HIERARCHY}
         }
-
-
-def get_transitive_predictions(predicted_classes):
-    # get all parents of predicted classes
-    all_predicted = [cls for clss in predicted_classes for cls in clss]
-    q = queue.Queue()
-    for cls in all_predicted:
-        q.put(cls)
-    while not q.empty():
-        cls = q.get()
-        for parent in CHEBI_FRAGMENT.successors(cls):
-            if parent not in all_predicted:
-                all_predicted.append(parent)
-                q.put(parent)
-    return all_predicted
 
 
 def verify_disjointness(predicted_classes):
@@ -183,15 +167,13 @@ class PredictionDetailApiHandler(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument("type", type=str)
         parser.add_argument("smiles", type=str)
+        parser.add_argument("selectedModels", type=dict)
 
         args = parser.parse_args()
-
         # note, the post req from frontend needs to match the strings here (e.g. 'type and 'message')
-
         request_type = args["type"]
         smiles = args["smiles"]
         selected_models = args["selectedModels"]
-
 
         predicted_classes = []
         predicted_by_model = {}
@@ -239,5 +221,5 @@ class PredictionDetailApiHandler(Resource):
 if __name__ == "__main__":
     gnn = AVAILABLE_MODELS[2]
     print(gnn)
-    smiles = "CC(=O)Oc1ccccc1C(=O)O"
+    smiles = "[F-].[H][N+]([H])([H])[H]"
     print(gnn.read_smiles(smiles))

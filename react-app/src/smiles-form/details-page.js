@@ -79,7 +79,6 @@ export function DetailsPerModel(data) {
 export default function DetailsPage(data) {
     const handleClose = data.handleClose;
     data = data.detail;
-    console.log(data.models_info);
 
     return (
         <Box sx={{ height: '100%'}}>

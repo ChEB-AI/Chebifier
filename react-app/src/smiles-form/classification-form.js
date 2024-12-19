@@ -143,7 +143,7 @@ function EditToolbar(props) {
             }
         }).then(response => {
             setRows((oldRows) => oldRows.map((row, i) => ({
-                ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i],
+                ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i], "violations": response.data.violations[i]
             })));
             setOntology(response.data.ontology)
         });
@@ -191,7 +191,6 @@ export default function ClassificationGrid() {
 
     if (Object.keys(hierarchy).length === 0) {
         axios.get('/api/hierarchy').then(response => {
-        	console.log("Getting hierarchy");
             setHierarchy(response.data.hierarchy);
             setAvailableModels(response.data.available_models);
             setAvailableModelsInfoTexts(response.data.available_models_info_texts);
@@ -200,7 +199,6 @@ export default function ClassificationGrid() {
            		newSelectedModels[response.data.available_models[i]] = true;
            	}
 			setSelectedModels(newSelectedModels);
-			console.log("new selected models", newSelectedModels);
 
 
         });
@@ -223,19 +221,47 @@ export default function ClassificationGrid() {
 
     const renderClasses = (params) => {
         const data = params.value;
+        const violations = params.row.violations;
         if (data == null){
           return  <Alert severity="error">Could not process input!</Alert>
         } else {
-            return <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
-                {(data.map((x) => <Chip component="a" href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")} label={hierarchy[x].label} clickable target="_blank"/>))}
-                </Box>
+            return (
+            	<Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+                {data.map((x) => {
+                	const violation = violations.find(violation => violation.includes(x));
+                	const isViolation = violation !== undefined;
+
+                	const tooltipText = isViolation ? `This prediction violates a disjointness axiom between ${violation.map(v => hierarchy[v].label).join(' and ')}` : '';
+                	if (isViolation) {
+						return (
+							<Tooltip key={x} title={tooltipText} placement="top" arrow>
+								<Chip
+									component="a"
+									href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")}
+									label={hierarchy[x].label}
+									clickable
+									target="_blank"
+									sx={{ backgroundColor: isViolation ? 'red' : 'default' }}
+								/>
+							</Tooltip>
+						);
+                	} else {
+                		return (
+                			<Chip component="a" href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")} label={hierarchy[x].label} clickable target="_blank"/>
+                		);
+                	}
+                })}
+            	</Box>
+			);
         }
     };
 
     const [open, setOpen] = React.useState(false);
     const handleOpen = (id) => () => {
         const thisRow = rows.find((row) => row.id === id);
-        axios.post('/api/details', {smiles: thisRow.smiles}).then(response => {
+        console.log(selectedModels);
+        console.log(thisRow);
+        axios.post('/api/details', {smiles: thisRow.smiles, selectedModels: selectedModels}).then(response => {
             setDetail({
                 plain_molecule: response.data.figures.plain_molecule,
                 models_info: response.data.models,
@@ -337,6 +363,7 @@ export default function ClassificationGrid() {
                         },
                     }}
                 >
+
 					<Box>
 						<FormControl component="fieldset" variant="standard">
 							<FormLabel component="legend">Select models:</FormLabel>
@@ -377,7 +404,10 @@ export default function ClassificationGrid() {
 					[1] Glauer, Martin, et al.: Chebifier: Automating Semantic Classification in ChEBI to Accelerate
 					Data-driven Discovery; Digital Discovery 3.5 (2024), <Link href="https://doi.org/10.1039/D3DD00238A">Link</Link>
 					<br />
-					[2] (preprint): ChemLog
+					[2] (in submission): ChemLog
+					<br />
+					[3] Bresson, Xavier, and Laurent, Thomas: Residual gated graph convnets; arXiv preprint arXiv:1711.07553 (2017),
+					<Link href="https://arxiv.org/abs/1711.07553">Link</Link>
 				</Text>
       		</Paper>
 

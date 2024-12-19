@@ -10,7 +10,7 @@ from chemlog.solving_strategies.fixed_fol_strategy import FixedFOLStrategy
 
 from rdkit import Chem
 
-from chebi_utils import CHEBI_FRAGMENT
+from chebi_utils import CHEBI_FRAGMENT, get_transitive_predictions
 from prediction_models.base import PredictionModel
 
 CHEBI_VERSION = 237
@@ -66,8 +66,9 @@ class ChemLog(PredictionModel):
     def predict(self, smiles_list):
         # only return positive predictions
         results = self.get_chemlog_results(smiles_list)
-        return [[cls for cls, pred in result.items() if pred in [0, 4]] if result is not None else None for result in
+        positive = [[cls for cls, pred in result.items() if pred in [0, 4]] if result is not None else None for result in
                 results]
+        return [get_transitive_predictions([positive_i]) for positive_i in positive]
 
     def build_explain_blocks_atom_allocations(self, allocations, cls_name):
         print(allocations)
@@ -80,7 +81,7 @@ class ChemLog(PredictionModel):
 
     def build_explain_blocks_depsi(self, highlights, preds, allocations):
         blocks = []
-        blocks.append(("heading", "Despipeptide"))
+        blocks.append(("heading", "Depsipeptide"))
         if not highlights["is_connected"]:
             blocks.append(("text", "The molecule is not connected. Therefore, it cannot be a depsipeptide."))
             return blocks
