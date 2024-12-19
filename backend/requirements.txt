@@ -4,3 +4,8 @@ flask-cors
 chebai
 rdkit
 lightning
+matplotlib
+networkx
+torch
+numpy
+chemlog
