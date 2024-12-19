@@ -131,9 +131,9 @@ class BatchPrediction(Resource):
         # array with dimensions [n_samples, n_violations, 2]
         violations = verify_disjointness(predicted_classes)
         # replace the violation-causing classes with the direct predictions that are influenced by them
-        violations_direct = [[[direct_pred for direct_pred in direct_preds
-                       if any(direct_pred == v or nx.has_path(graph_smiles,direct_pred, v)
-                               for v in violation)] for violation in violations_sample]
+        violations_direct = [[[{v: [direct_pred for direct_pred in direct_preds
+                       if direct_pred == v or nx.has_path(graph_smiles,direct_pred, v)]
+                               for v in violation}] for violation in violations_sample]
                       for violations_sample, direct_preds, graph_smiles in zip(violations, direct_parents, graphs_per_smiles)]
         result = {
             "predicted_parents": predicted_classes,

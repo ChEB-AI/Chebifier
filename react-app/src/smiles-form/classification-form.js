@@ -228,10 +228,24 @@ export default function ClassificationGrid() {
             return (
             	<Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
                 {data.map((x) => {
-                	const violation = violations.find(violation => violation.includes(x));
-                	const isViolation = violation !== undefined;
+                	var isViolation = false;
+                	var tooltipText = "";
+                	for (var i = 0; i < violations.length; i++) {
+                		const this_violation = violations[i][0];
+                		var children_str = [];
+						for (const [violated_cls, children] of Object.entries(this_violation)) {
+							children_str.push(`${children.map(v => hierarchy[v].label).join(', ')} ${(children.length != 1) ? "are subclasses" : "is a subclass"} of ${hierarchy[violated_cls].label}`);
+						}
+                		for (const [violated_cls, children] of Object.entries(this_violation)) {
+                			if (children.includes(x)) {
+                				isViolation = true;
 
-                	const tooltipText = isViolation ? `This prediction violates a disjointness axiom between ${violation.map(v => hierarchy[v].label).join(' and ')}` : '';
+								tooltipText = `This prediction is inconsistent: ${Object.keys(this_violation).map(v => hierarchy[v].label).join(' and ')} are marked as disjoint in ChEBI. ${children_str.join(', ')}`;
+								break;
+                			}
+                		}
+
+					}
                 	if (isViolation) {
 						return (
 							<Tooltip key={x} title={tooltipText} placement="top" arrow>
