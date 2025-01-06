@@ -311,7 +311,7 @@ export default function ClassificationGrid() {
     const columns = [
         {
             field: 'smiles',
-            headerName: 'Smiles',
+            headerName: 'SMILES',
             flex: 0.45,
             editable: true,
             preProcessEditCellProps: (params) => {
@@ -358,16 +358,14 @@ export default function ClassificationGrid() {
     }
 
     return (
+      <div className="App">
+        <header className="App-header">
         <Box sx={{width: "100%"}}>
-            <Box>
-                <h1>Chebifier</h1>
-                Classify chemical structures using AI.
-            </Box>
 
             <Paper sx={{width: "100%"}}>
                 <Box
                     sx={{
-                        height: 500,
+                        height: 600,
                         width: '100%',
                         '& .actions': {
                             color: 'text.secondary',
@@ -377,17 +375,6 @@ export default function ClassificationGrid() {
                         },
                     }}
                 >
-
-					<Box>
-						<FormControl component="fieldset" variant="standard">
-							<FormLabel component="legend">Select models:</FormLabel>
-							<FormGroup>
-						{modelList}
-							</FormGroup>
-						</FormControl>
-
-					</Box>
-
                     <DataGrid
                         rows={rows}
                         columns={columns}
@@ -411,19 +398,16 @@ export default function ClassificationGrid() {
             <Paper>
                 {plot_ontology(ontology,true,false)}
             </Paper>
+			<Paper>
+				<FormControl component="fieldset" variant="standard">
+					<FormLabel component="legend">Select models:</FormLabel>
+					<FormGroup>
+						{modelList}
+					</FormGroup>
+				</FormControl>
+			</Paper>
 
-            <Paper>
-            	<Text>
-					<b>References:</b><br />
-					[1] Glauer, Martin, et al.: Chebifier: Automating Semantic Classification in ChEBI to Accelerate
-					Data-driven Discovery; Digital Discovery 3.5 (2024), <Link href="https://doi.org/10.1039/D3DD00238A">Link</Link>
-					<br />
-					[2] (in submission): ChemLog
-					<br />
-					[3] Bresson, Xavier, and Laurent, Thomas: Residual gated graph convnets; arXiv preprint arXiv:1711.07553 (2017),
-					<Link href="https://arxiv.org/abs/1711.07553">Link</Link>
-				</Text>
-      		</Paper>
+
 
             <Modal
               open={open}
@@ -447,5 +431,7 @@ export default function ClassificationGrid() {
             </Modal>
 
         </Box>
+        </header>
+  </div>
     );
 }
