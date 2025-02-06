@@ -1,7 +1,14 @@
 {
     "TESTING":true,
-    "ELECTRA_CHECKPOINT":"path-to-checkpoint",
-    "BATCH_SIZE": 10,
-    "CLASS_HEADERS": "path-to-classes.txt",
-    "CHEBI_JSON": "path-to-chebi100.json"
+    "CHEBI_JSON": "path-to-chebi-export.json",
+    "MODELS": [
+        {
+            "class": "PythonClassName",
+            "name": "Model name",
+            "checkpoint_path": "path-to-checkpoint.ckpt",
+            "batch_size": 32,
+            "data_class": "ChEBI100",
+            "prediction_headers_path": "path-to-classes.txt"
+        }
+    ]
 }

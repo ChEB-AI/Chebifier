@@ -64,10 +64,10 @@ export function DetailsPerModel(data) {
 					<h2>Insights for {model_name}:</h2>
 					{model_data.model_type === "ELECTRA" ? (
 						<DetailsElectra model_data={model_data} />
-					) : model_data.model_type === "ChemLog" ? (
+					) : model_data.model_type === "ChemLog Peptides" ? (
 						<DetailsChemlog model_data={model_data} />
 					) : (
-						<Typography>Model type {model_data.model_type} not supported for explanations.</Typography>
+						<Typography>Model type {model_data.model_type} is not supported for explanations.</Typography>
 					)}
 				</Box>
 			))

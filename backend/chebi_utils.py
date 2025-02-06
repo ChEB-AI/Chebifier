@@ -15,7 +15,6 @@ def load_sub_ontology():
 
 CHEBI_FRAGMENT = load_sub_ontology()
 
-
 def get_transitive_predictions(predicted_classes):
     # get all parents of predicted classes
     all_predicted = [cls for clss in predicted_classes for cls in clss]
