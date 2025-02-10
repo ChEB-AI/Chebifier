@@ -1,29 +1,17 @@
 import React from 'react';
-import axios from 'axios'
 
 import {useEffect, useRef} from "react";
 import {Network} from "vis-network";
 
-import Accordion from '@mui/material/Accordion';
-import AccordionSummary from '@mui/material/AccordionSummary';
-import AccordionDetails from '@mui/material/AccordionDetails';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CancelIcon from '@mui/icons-material/Close';
-import Divider from '@mui/material/Divider';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import FormControl from '@mui/material/FormControl';
-import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
-import Skeleton from '@mui/material/Skeleton';
-import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import TabContext from '@mui/lab/TabContext';
 import TabList from '@mui/lab/TabList';
 import TabPanel from '@mui/lab/TabPanel';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import {styled} from '@mui/material/styles';
 
 import {plot_ontology} from "./ontology-utils";
 
@@ -90,14 +78,6 @@ export function LayerTabs(layers) {
     );
 }
 
-const Item = styled(Paper)(({theme}) => ({
-    backgroundColor: theme.palette.mode === 'dark' ? '#1A2027' : '#fff',
-    ...theme.typography.body2,
-    padding: theme.spacing(1),
-    textAlign: 'center',
-    color: theme.palette.textsecondary,
-}));
-
 export default function DetailsPage(data) {
     const handleClose = data.handleClose;
     data = data.detail;
@@ -127,7 +107,7 @@ export default function DetailsPage(data) {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                 }}>
-                                <img src={`data:image/jpeg;base64,${data.plain_molecule}`} width="300" height="300"/></div>
+                                <img src={`data:image/jpeg;base64,${data.plain_molecule}`} alt="Molecular graph of the submitted chemical" width="300" height="300"/></div>
                             </Box>
                             <Box>
                                 <Typography><h2>ChEBI Classification</h2></Typography>

@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { useEffect } from 'react';
 import axios from "axios";
 import Alert from '@mui/material/Alert';
 import PropTypes from 'prop-types';
@@ -7,10 +6,8 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
-import CloseIcon from '@mui/icons-material/Close';
 import Chip from '@mui/material/Chip';
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
@@ -34,48 +31,8 @@ import {
 import DetailsPage from "./details-page";
 import {plot_ontology} from "./ontology-utils";
 
-const RenderDate = (props) => {
-  const { hasFocus, value } = props;
-  const buttonElement = React.useRef(null);
-  const rippleRef = React.useRef(null);
-
-  React.useLayoutEffect(() => {
-    if (hasFocus) {
-      const input = buttonElement.current?.querySelector('input');
-      input?.focus();
-    } else if (rippleRef.current) {
-      // Only available in @mui/material v5.4.1 or later
-      rippleRef.current.stop({});
-    }
-  }, [hasFocus]);
-
-  return (
-    <strong>
-      {value?.getFullYear() ?? ''}
-      <Button
-        component="button"
-        ref={buttonElement}
-        touchRippleRef={rippleRef}
-        variant="contained"
-        size="small"
-        style={{ marginLeft: 16 }}
-        // Remove button from tab sequence when cell does not have focus
-        tabIndex={hasFocus ? 0 : -1}
-        onKeyDown={(event) => {
-          if (event.key === ' ') {
-            // Prevent key navigation when focus is on button
-            event.stopPropagation();
-          }
-        }}
-      >
-        Open
-      </Button>
-    </strong>
-  );
-};
-
 function EditToolbar(props) {
-    const {setRows, setRowModesModel, rows, getLabel, setOntology} = props;
+    const {setRows, setRowModesModel, rows, setOntology} = props;
 
     const addRows = ((smiles) => {
             const ids = smiles.map((s) => randomId());
@@ -251,10 +208,6 @@ export default function ClassificationGrid() {
         },
     ];
 
-    const getLabel = (x) => {
-        return hierarchy[x]["label"]
-    }
-
     return (
         <Box sx={{width: "100%"}}>
             <Box>
@@ -286,7 +239,7 @@ export default function ClassificationGrid() {
                             Toolbar: EditToolbar,
                         }}
                         componentsProps={{
-                            toolbar: {setRows, setRowModesModel, rows, getLabel, setOntology},
+                            toolbar: {setRows, setRowModesModel, rows, setOntology},
                         }}
                         experimentalFeatures={{newEditingApi: true}}
                     />
