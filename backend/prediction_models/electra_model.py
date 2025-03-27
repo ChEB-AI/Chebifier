@@ -48,8 +48,9 @@ def build_graph_from_attention(att, node_labels, token_labels, threshold=0.0):
 class ElectraModel(NNPredictionModel):
 
     def __init__(self, checkpoint_path: str, data_class: Union[XYBaseDataModule, str],
-                 prediction_headers_path: str, batch_size: Optional[int] = 8, name: Optional[str] = None):
-        super().__init__(prediction_headers_path, batch_size, name)
+                 prediction_headers_path: str, batch_size: Optional[int] = 8, name: Optional[str] = None,
+                 description: Optional[str] = "Transformer model for predicting arbitrary ChEBI classes."):
+        super().__init__(prediction_headers_path, batch_size, name, description)
         self.model = Electra.load_from_checkpoint(
             checkpoint_path, map_location=torch.device(device), criterion=None, strict=False,
             metrics=dict(train=dict(), test=dict(), validation=dict()), pretrained_checkpoint=None)
@@ -66,11 +67,6 @@ class ElectraModel(NNPredictionModel):
     @property
     def default_name(self) -> str:
         return "ELECTRA"
-
-    @property
-    def info_text(self) -> str:
-        return ("Transformer model for predicting arbitrary ChEBI classes that have a certain number of instances, "
-                "see [1].")
 
     def explain(self, smiles) -> dict:
         reader = self.data_class.READER()

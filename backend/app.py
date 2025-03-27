@@ -21,10 +21,11 @@ def serve(path):
 
 def load_endpoints():
     from api.chemclass import PredictionDetailApiHandler, BatchPrediction, \
-        HierarchyAPI
+        HierarchyAPI, ModelInfoAPI
     api.add_resource(PredictionDetailApiHandler, '/api/details')
     api.add_resource(BatchPrediction, '/api/classify')
     api.add_resource(HierarchyAPI, '/api/hierarchy')
+    api.add_resource(ModelInfoAPI, '/api/modelinfo')
 
 with app.app_context():
     mp.set_start_method("spawn")

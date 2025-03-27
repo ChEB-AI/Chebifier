@@ -19,8 +19,10 @@ else:
 class GNNResGated(NNPredictionModel):
 
     def __init__(self, checkpoint_path: str, data_class: Union[GraphPropertiesMixIn, str],
-                 prediction_headers_path: str, batch_size: Optional[int] = 32, name: Optional[str] = None):
-        super().__init__(prediction_headers_path, batch_size, name)
+                 prediction_headers_path: str, batch_size: Optional[int] = 32, name: Optional[str] = None,
+                 description: Optional[str] = "Residual-gated Graph Convolutional Network for "
+                                              "predicting arbitrary ChEBI classes."):
+        super().__init__(prediction_headers_path, batch_size, name, description)
         self.model = ResGatedGraphConvNetGraphPred.load_from_checkpoint(
             checkpoint_path, map_location=torch.device(device), criterion=None, strict=False,
             metrics=dict(train=dict(), test=dict(), validation=dict()), pretrained_checkpoint=None,
@@ -42,11 +44,6 @@ class GNNResGated(NNPredictionModel):
     @property
     def default_name(self) -> str:
         return "ResGatedGraphConvNet"
-
-    @property
-    def info_text(self) -> str:
-        return ("Residual gated graph convolutional network (see [3]) for predicting arbitrary ChEBI classes that "
-                "have a certain number of instances.")
 
     def read_smiles(self, smiles):
         reader = self.data_class.READER()

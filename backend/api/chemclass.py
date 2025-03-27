@@ -65,6 +65,13 @@ class HierarchyAPI(Resource):
             "hierarchy": {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses", [])) for r in LABEL_HIERARCHY}
         }
 
+class ModelInfoAPI(Resource):
+
+    def get(self):
+        return {
+            "available_models": [model.name for model in AVAILABLE_MODELS],
+            "available_models_info_texts": [model.info_text for model in AVAILABLE_MODELS]
+        }
 
 def verify_disjointness(predicted_classes):
     disjoints = []
@@ -182,8 +189,9 @@ class PredictionDetailApiHandler(Resource):
             if model.name in selected_models.keys() and selected_models[model.name]:
                 explain_infos_model = model.explain(smiles)
                 pred = model.predict([smiles])[0]
-                predicted_classes += pred
-                predicted_by_model[model.name] = pred
+                if pred is not None:
+                    predicted_classes += pred
+                    predicted_by_model[model.name] = pred
                 if explain_infos_model is not None:
                     explain_infos_model["model_type"] = model.default_name
                     explain_infos_model["model_info"] = model.info_text

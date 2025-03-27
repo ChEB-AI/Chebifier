@@ -1,10 +1,15 @@
 from typing import Optional
 
-from chemlog2.classification.charge_classifier import get_charge_category, ChargeCategories
-from chemlog2.classification.peptide_size_classifier import get_n_amino_acid_residues
-from chemlog2.classification.proteinogenics_classifier import get_proteinogenic_amino_acids
-from chemlog2.classification.substructure_classifier import is_emericellamide, is_diketopiperazine
-from chemlog2.cli import resolve_chebi_classes
+import sys
+import os
+sys.path.append(os.path.join("..", "..", "..", "PycharmProjects", "chemlog2"))
+import chemlog
+
+from chemlog.classification.charge_classifier import get_charge_category, ChargeCategories
+from chemlog.classification.peptide_size_classifier import get_n_amino_acid_residues
+from chemlog.classification.proteinogenics_classifier import get_proteinogenic_amino_acids
+from chemlog.classification.substructure_classifier import is_emericellamide, is_diketopiperazine
+from chemlog.cli import resolve_chebi_classes
 
 from rdkit import Chem
 
@@ -39,16 +44,12 @@ AA_DICT = {
 
 class ChemLog(PredictionModel):
 
-    def __init__(self, name: Optional[str] = None):
-        super().__init__(name)
+    def __init__(self, name: Optional[str] = None, description: Optional[str] = "A rule-based model for predicting peptides and peptide-like molecules."):
+        super().__init__(name, description)
 
     @property
     def default_name(self):
         return "ChemLog Peptides"
-
-    @property
-    def info_text(self):
-        return "A rule-based model for predicting peptides and peptide-like molecules, see [2]."
 
     def get_chemlog_results(self, smiles_list) -> list:
         all_preds = []
@@ -108,7 +109,6 @@ class ChemLog(PredictionModel):
             results["2,5-diketopiperazines"] = diketopiperazine[0]
             if diketopiperazine[0]:
                 results["2,5-diketopiperazines_atoms"] = diketopiperazine[1]
-        print(results)
 
         return {**results, **add_output}
 

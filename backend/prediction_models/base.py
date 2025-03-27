@@ -7,8 +7,9 @@ from rdkit import Chem
 
 class PredictionModel(abc.ABC):
 
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self, name: Optional[str] = None, description: Optional[str] = None):
         self._name = name or self.default_name
+        self._description = description
 
     @property
     def default_name(self) -> str:
@@ -20,7 +21,9 @@ class PredictionModel(abc.ABC):
 
     @property
     def info_text(self) -> str:
-        return "A prediction model."
+        if self._description is None:
+            return "No description is available for this model."
+        return self._description
 
     def predict(self, smiles_list) -> list:
         pass
@@ -31,8 +34,9 @@ class PredictionModel(abc.ABC):
 
 class NNPredictionModel(PredictionModel):
 
-    def __init__(self, prediction_headers_path: str, batch_size: Optional[int] = 32, name: Optional[str] = None):
-        super().__init__(name)
+    def __init__(self, prediction_headers_path: str, batch_size: Optional[int] = 32, name: Optional[str] = None,
+                 description: Optional[str] = None):
+        super().__init__(name, description)
         self.batch_size = batch_size
         self.prediction_headers = ["CHEBI:" + r.strip() for r in open(prediction_headers_path, encoding="utf-8")]
         self.model = None
@@ -73,6 +77,7 @@ class NNPredictionModel(PredictionModel):
             except Exception as e:
                 # Note if it fails
                 could_not_parse.append(i)
+                print(f"Failing to parse {smiles} due to {e}")
             else:
                 if rdmol is None:
                     could_not_parse.append(i)
@@ -80,6 +85,7 @@ class NNPredictionModel(PredictionModel):
                     index_map[i] = len(token_dicts)
                     token_dicts.append(d)
         results = []
+        print(f"Predicting {len(token_dicts), token_dicts} out of {len(smiles_list)}")
         if token_dicts:
             for batch in self.batchify(token_dicts):
                 result = self.calculate_results(batch)
