@@ -17,7 +17,7 @@ import ListSubheader from '@mui/material/ListSubheader';
 import Typography from '@mui/material/Typography';
 
 
-function buildNode(id, node, includeLabel=true){
+function buildNode(id, node, node_color=false, includeLabel=true){
     const d = {id:id}
     d["title"] = node["lbl"]
     if(!node.artificial){
@@ -25,6 +25,9 @@ function buildNode(id, node, includeLabel=true){
     } else {
         d["color"] = "#c4c4c0"
     }
+    if (node_color != false) {
+    	d["color"] = node_color;
+	}
     return d
 }
 
@@ -134,7 +137,8 @@ export function VisNetwork(data) {
 
         if(data.graph != null){
             const g = {
-                nodes: Object.keys(data.graph.nodes).map(k => buildNode(k, data.graph.nodes[k])),
+                nodes: Object.keys(data.graph.nodes).map(k => buildNode(k, data.graph.nodes[k],
+                		("node_colors" in data.graph && k in data.graph.node_colors) ? data.graph.node_colors[k] : false)),
                 edges: Object.keys(data.graph.edges).map(k => buildEdge(k, data.graph.edges[k]))
             }
             const network =

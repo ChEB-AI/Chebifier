@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useEffect } from 'react';
+import {Text} from 'react-native';
 import axios from "axios";
 import Alert from '@mui/material/Alert';
 import PropTypes from 'prop-types';
@@ -8,6 +9,7 @@ import Paper from '@mui/material/Paper';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
+import Switch from '@mui/material/Switch';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
@@ -20,6 +22,13 @@ import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
 import StartIcon from '@mui/icons-material/Start';
 import Modal from '@mui/material/Modal';
+import FormLabel from '@mui/material/FormLabel';
+import FormControl from '@mui/material/FormControl';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormHelperText from '@mui/material/FormHelperText';
+import Tooltip from '@mui/material/Tooltip';
+import Link from '@mui/material/Link';
 
 import {
     GridRowModes,
@@ -74,8 +83,19 @@ const RenderDate = (props) => {
   );
 };
 
+const Checkbox = ({label, value, onChange, checked=true}) => {
+	return (
+		<label key={value}>
+			<input type="checkbox" name={label} checked={checked} onChange={onChange} />
+			{label}
+		</label>
+	);
+};
+
+
+
 function EditToolbar(props) {
-    const {setRows, setRowModesModel, rows, getLabel, setOntology} = props;
+    const {setRows, setRowModesModel, rows, getLabel, setOntology, selectedModels} = props;
 
     const addRows = ((smiles) => {
             const ids = smiles.map((s) => randomId());
@@ -116,10 +136,14 @@ function EditToolbar(props) {
         axios({
             url: '/api/classify',
             method: 'post',
-            data: {smiles: rows.map((r) => (r["smiles"])), ontology: true}
+            data: {
+            	smiles: rows.map((r) => (r["smiles"])),
+            	ontology: true,
+            	selectedModels: selectedModels
+            }
         }).then(response => {
             setRows((oldRows) => oldRows.map((row, i) => ({
-                ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i],
+                ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i], "violations": response.data.violations[i]
             })));
             setOntology(response.data.ontology)
         });
@@ -159,9 +183,24 @@ export default function ClassificationGrid() {
 
     const [ontology, setOntology] = React.useState(null);
 
+    const [availableModels, setAvailableModels] = React.useState([]);
+	const [availableModelsInfoTexts, setAvailableModelsInfoTexts] = React.useState([]);
+    const [selectedModels, setSelectedModels] = React.useState({});
+
+
+
     if (Object.keys(hierarchy).length === 0) {
         axios.get('/api/hierarchy').then(response => {
-            setHierarchy(response.data);
+            setHierarchy(response.data.hierarchy);
+            setAvailableModels(response.data.available_models);
+            setAvailableModelsInfoTexts(response.data.available_models_info_texts);
+           	var newSelectedModels = {};
+           	for (var i = 0; i < response.data.available_models.length; i++) {
+           		newSelectedModels[response.data.available_models[i]] = true;
+           	}
+			setSelectedModels(newSelectedModels);
+
+
         });
     }
 
@@ -182,23 +221,66 @@ export default function ClassificationGrid() {
 
     const renderClasses = (params) => {
         const data = params.value;
+        const violations = params.row.violations;
         if (data == null){
           return  <Alert severity="error">Could not process input!</Alert>
         } else {
-            return <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
-                {(data.map((x) => <Chip component="a" href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")} label={hierarchy[x].label} clickable target="_blank"/>))}
-                </Box>
+            return (
+            	<Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
+                {data.map((x) => {
+                	var isViolation = false;
+                	var tooltipText = "";
+                	for (var i = 0; i < violations.length; i++) {
+                		const this_violation = violations[i][0];
+                		var children_str = [];
+						for (const [violated_cls, children] of Object.entries(this_violation)) {
+							children_str.push(`${children.map(v => hierarchy[v].label).join(', ')} ${(children.length != 1) ? "are subclasses" : "is a subclass"} of ${hierarchy[violated_cls].label}`);
+						}
+                		for (const [violated_cls, children] of Object.entries(this_violation)) {
+                			if (children.includes(x)) {
+                				isViolation = true;
+
+								tooltipText = `This prediction is inconsistent: ${Object.keys(this_violation).map(v => hierarchy[v].label).join(' and ')} are marked as disjoint in ChEBI. ${children_str.join(', ')}`;
+								break;
+                			}
+                		}
+
+					}
+                	if (isViolation) {
+						return (
+							<Tooltip key={x} title={tooltipText} placement="top" arrow>
+								<Chip
+									component="a"
+									href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")}
+									label={hierarchy[x].label}
+									clickable
+									target="_blank"
+									sx={{ backgroundColor: isViolation ? 'red' : 'default' }}
+								/>
+							</Tooltip>
+						);
+                	} else {
+                		return (
+                			<Chip component="a" href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")} label={hierarchy[x].label} clickable target="_blank"/>
+                		);
+                	}
+                })}
+            	</Box>
+			);
         }
     };
 
     const [open, setOpen] = React.useState(false);
     const handleOpen = (id) => () => {
         const thisRow = rows.find((row) => row.id === id);
-        axios.post('/api/details', {smiles: thisRow.smiles}).then(response => {
+        console.log(selectedModels);
+        console.log(thisRow);
+        axios.post('/api/details', {smiles: thisRow.smiles, selectedModels: selectedModels}).then(response => {
             setDetail({
                 plain_molecule: response.data.figures.plain_molecule,
-                graphs: response.data.graphs,
-                chebi: response.data.classification
+                models_info: response.data.models,
+                chebi: response.data.classification,
+                chebi_legend: response.data.color_legend
             });
             setOpen(true);
         });
@@ -206,10 +288,30 @@ export default function ClassificationGrid() {
     }
     const handleClose = () => setOpen(false);
 
+    const handleCheckboxChange= (event) => {
+    	const checkedModel = event.target.name;
+    	setSelectedModels({...selectedModels, [checkedModel]: event.target.checked});
+	};
+
+	const modelList = availableModels.map((model,index) => (
+		<>
+			<Tooltip title={availableModelsInfoTexts[index]} placement="bottom-start" arrow>
+			<FormControlLabel
+				control={<Switch checked={selectedModels[model]} onChange={handleCheckboxChange} name={model} />}
+				label={model}
+			/>
+			</Tooltip>
+		</>
+
+    ));
+
+
+
+
     const columns = [
         {
             field: 'smiles',
-            headerName: 'Smiles',
+            headerName: 'SMILES',
             flex: 0.45,
             editable: true,
             preProcessEditCellProps: (params) => {
@@ -233,18 +335,18 @@ export default function ClassificationGrid() {
                 const wasPredicted = thisRow.direct_parents?.length > 0;
 
                 return [
-                    <GridActionsCellItem
-                        icon={<DeleteIcon/>}
-                        label="Delete"
-                        onClick={handleDeleteClick(id)}
-                        color="inherit"
-                    />,
-                    <GridActionsCellItem
+                	<GridActionsCellItem
                         icon={<LightbulbIcon/>}
                         label="Details"
                         onClick={handleOpen(id)}
                         color="inherit"
                         disabled={!wasPredicted}
+                    />,
+                    <GridActionsCellItem
+                        icon={<DeleteIcon/>}
+                        label="Delete"
+                        onClick={handleDeleteClick(id)}
+                        color="inherit"
                     />,
                 ];
             },
@@ -256,15 +358,14 @@ export default function ClassificationGrid() {
     }
 
     return (
+      <div className="App">
+        <header className="App-header">
         <Box sx={{width: "100%"}}>
-            <Box>
-                <h1>Chebifier</h1>
-                Classify chemical structures using AI.
-            </Box>
+
             <Paper sx={{width: "100%"}}>
                 <Box
                     sx={{
-                        height: 500,
+                        height: 600,
                         width: '100%',
                         '& .actions': {
                             color: 'text.secondary',
@@ -286,16 +387,27 @@ export default function ClassificationGrid() {
                             Toolbar: EditToolbar,
                         }}
                         componentsProps={{
-                            toolbar: {setRows, setRowModesModel, rows, getLabel, setOntology},
+                            toolbar: {setRows, setRowModesModel, rows, getLabel, setOntology, selectedModels},
                         }}
                         experimentalFeatures={{newEditingApi: true}}
                     />
+
                 </Box>
             </Paper>
 
             <Paper>
                 {plot_ontology(ontology,true,false)}
             </Paper>
+			<Paper>
+				<FormControl component="fieldset" variant="standard">
+					<FormLabel component="legend">Select models:</FormLabel>
+					<FormGroup>
+						{modelList}
+					</FormGroup>
+				</FormControl>
+			</Paper>
+
+
 
             <Modal
               open={open}
@@ -319,5 +431,7 @@ export default function ClassificationGrid() {
             </Modal>
 
         </Box>
+        </header>
+  </div>
     );
 }

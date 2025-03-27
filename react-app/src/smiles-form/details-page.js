@@ -26,70 +26,13 @@ import Typography from '@mui/material/Typography';
 import {styled} from '@mui/material/styles';
 
 import {plot_ontology} from "./ontology-utils";
-
-const NetworkElement = (data) => {
-    const visJsRef = useRef(null);
-    useEffect(() => {
-        if(data.graph != null){
-            const g = {
-                nodes: data.graph.nodes,
-                edges: data.graph.edges
-            }
-            const network = visJsRef.current && new Network(
-                visJsRef.current, g, {
-                physics: false,
-                width: "100%",
-                height: "100%",
-                clickToUse: true
-            });
-            network.fit()
-        }
-    }, [visJsRef, data]);
-    return <Box><div ref={visJsRef}/></Box>
-}
-
-const LayerComponent = (data) => {
-    const [value, setValue] = React.useState(0);
-
-    const handleChange = (event, newValue) => {
-        setValue(newValue);
-    };
-
-    return (
-        <Box sx={{width: '100%', typography: 'body1'}}>
-            <TabContext value={value}>
-                <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
-                    <TabList onChange={handleChange} aria-label="lab API tabs example">
-                        {data.layer.map((layer, i) => <Tab label={"Head " + (i + 1)} value={i}/>)}
-                    </TabList>
-                </Box>
-                {data.layer.map((g, i) => <TabPanel value={i}>< NetworkElement graph={g} /></TabPanel>)}
-            </TabContext>
-        </Box>
-    );
-}
+import {DetailsElectra} from "./details-electra";
+import {DetailsChemlog} from "./details-page-chemlog";
 
 
-export function LayerTabs(layers) {
-    const [value, setValue] = React.useState(0);
-    const handleChange = (event, newValue) => {
-        setValue(newValue);
-    };
 
-    return (
-        <Box sx={{width: '100%', typography: 'body1'}}>
-            <TabContext value={value}>
-                <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
-                    <TabList onChange={handleChange} aria-label="lab API tabs example">
-                        {layers.layers.map((layer, i) => <Tab label={"Layer " + (i + 1)} value={i} centered/>)}
-                    </TabList>
-                </Box>
-                {layers.layers.map((layer, i) => <TabPanel value={i}><LayerComponent layer={layer}/></TabPanel>)}
-            </TabContext>
-        </Box>
-    );
-}
 
+// is this used anywhere?
 const Item = styled(Paper)(({theme}) => ({
     backgroundColor: theme.palette.mode === 'dark' ? '#1A2027' : '#fff',
     ...theme.typography.body2,
@@ -97,6 +40,41 @@ const Item = styled(Paper)(({theme}) => ({
     textAlign: 'center',
     color: theme.palette.textsecondary,
 }));
+
+
+const Legend = ({ colors }) => {
+	return (
+		<Box>
+			{Object.entries(colors).map(([color, text]) => (
+				<Box key={color} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+					<Box sx={{ width: 30, height: 10, backgroundColor: color, borderRadius: 1 }} />
+					<Typography>{text}</Typography>
+				</Box>
+			))}
+		</Box>
+	);
+};
+
+export function DetailsPerModel(data) {
+	const models_info = data.models_info;
+	return (
+		<Box>
+			{Object.entries(models_info).map(([model_name, model_data]) => (
+				<Box>
+					<h2>Insights for {model_name}:</h2>
+					{model_data.model_type === "ELECTRA" ? (
+						<DetailsElectra model_data={model_data} />
+					) : model_data.model_type === "ChemLog Peptides" ? (
+						<DetailsChemlog model_data={model_data} />
+					) : (
+						<Typography>Model type {model_data.model_type} is not supported for explanations.</Typography>
+					)}
+				</Box>
+			))
+			}
+		</Box>
+	);
+};
 
 export default function DetailsPage(data) {
     const handleClose = data.handleClose;
@@ -133,24 +111,15 @@ export default function DetailsPage(data) {
                                 <Typography><h2>ChEBI Classification</h2></Typography>
                                 <Typography><h3>What am I seeing?</h3>
                                     The graph below shows you the position in the ChEBI ontology that our system
-                                    proposed. Not that this prediction is an estimate based on available data and may be
-                                    prone to errors.</Typography>
+                                    proposed. If multiple prediction methods were used, the color indicates by which
+                                    method each prediction has been made.</Typography>
+                                <Typography><b>Legend</b></Typography>
+                                <Legend colors={data.chebi_legend} />
                                 <Box>
                                     {plot_ontology(data.chebi)}
                                 </Box>
                             </Box>
-                            <Box>
-                                <Typography><h2>Attention</h2></Typography>
-                                <Typography><h3>What am I seeing?</h3>
-                                    The model iterates over all parts of the molecule. For each of this parts, the
-                                    system is distributing its attention over all parts of the molecule. E.g. if an
-                                    opening parenthesis is encountered, the system may try to identify the closing
-                                    counterpart. The parts of the molecule that the system is paying attention to, are
-                                    indicated by lines. Darker shades indicate stronger attention.</Typography>
-                                <Box sx={{height: "400px"}}>
-                                    <LayerTabs layers={data.graphs}/>
-                                </Box>
-                            </Box>
+                            {DetailsPerModel(data)}
                         </Box>
                     </Box>
                 </Paper>

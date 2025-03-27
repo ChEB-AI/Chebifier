@@ -1,6 +1,13 @@
 flask
 flask-restful
 flask-cors
-chebai
 rdkit
 lightning
+matplotlib
+networkx
+torch
+numpy>=2
+gavel>=0.1.7
+chemlog>=1.0.3
+chebai
+chebai-graph

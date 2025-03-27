@@ -1,22 +1,24 @@
-import torch.cuda
-from flask_restful import Api, Resource, reqparse
-from chebai.models.electra import Electra
-from chebai.preprocessing.reader import ChemDataReader, EMBEDDING_OFFSET
-from chebai.preprocessing.collate import RaggedCollater
-from chebai.result.molplot import AttentionMolPlot, AttentionNetwork
-from tempfile import NamedTemporaryFile
+import os
+import sys
+
+from flask_restful import Resource, reqparse
 from PIL import Image
 import base64
 import io
-import numpy as np
-import sys
 from app import app
 import matplotlib as mpl
-import json
 import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import torch
+from chebi_utils import LABEL_HIERARCHY, CHEBI_FRAGMENT, get_transitive_predictions
+import hashlib
+
+# not used directly, but will be resolved by AVAILABLE_MODELS
+from prediction_models.electra_model import ElectraModel
+from prediction_models.chemlog_model import ChemLog
+from prediction_models.gnn_resgated_model import GNNResGated
+
 mpl.use("Agg")
 
 if torch.cuda.is_available():
@@ -24,54 +26,17 @@ if torch.cuda.is_available():
 else:
     device = "cpu"
 
-BATCH_SIZE = app.config.get("BATCH_SIZE", 100)
-electra_model = None
+AVAILABLE_MODELS = []
+for model in app.config["MODELS"]:
+    cls = getattr(sys.modules[__name__], model["class"])
+    model_args = model.copy()
+    del model_args["class"]
+    AVAILABLE_MODELS.append(cls(**model_args))
 
-
-def load_model():
-    global electra_model
-    electra_model = Electra.load_from_checkpoint(app.config["ELECTRA_CHECKPOINT"], map_location=torch.device(device), pretrained_checkpoint=None, criterion=None, strict=False, metrics=dict(train=dict(), test=dict(), validation=dict()))
-    electra_model.eval()
-
-try:
-    import uwsgidecorators
-except ModuleNotFoundError:
-    load_model()
-else:
-    load_model = uwsgidecorators.postfork(load_model)
-
-
-PREDICTION_HEADERS = ["CHEBI:" + r.strip() for r in open(app.config["CLASS_HEADERS"])]
-LABEL_HIERARCHY = json.load(open(app.config["CHEBI_JSON"]))
-
-def load_sub_ontology():
-    g = nx.DiGraph()
-    g.add_nodes_from([(c["ID"], dict(lbl=c["LABEL"][0])) for c in LABEL_HIERARCHY])
-    g.add_edges_from([(t, c["ID"]) for c in LABEL_HIERARCHY for t in c.get("SubClasses",[])])
-    return g
-
-CHEBI_FRAGMENT = load_sub_ontology()
-
-
-def get_relevant_chebi_fragment(predictions, smiles, labels=None):
-    fragment_graph = CHEBI_FRAGMENT.copy()
-    predicted_subsumtions = [(i, h) for i in range(predictions.shape[0]) for h, p in zip(PREDICTION_HEADERS, predictions[i].tolist()) if p >= 0]
-    fragment_graph.add_edges_from(predicted_subsumtions)
-    necessary_nodes = set()
-    for i in range(predictions.shape[0]):
-        fragment_graph.nodes[i]["lbl"] = labels[i] if labels else smiles[i]
-        fragment_graph.nodes[i]["artificial"] = True
-        necessary_nodes = necessary_nodes.union(set(nx.shortest_path(fragment_graph, i)))
-    sub = nx.transitive_reduction(fragment_graph.subgraph(necessary_nodes))
-
-    # Copy node data to subgraph
-    sub.add_nodes_from(d for d in fragment_graph.nodes(data=True) if d[0] in sub.nodes)
-    keys = set(i for i,_ in predicted_subsumtions)
-    return sub, {k: [l for j,l in predicted_subsumtions if j == k] for k in keys}
 
 def _build_node(ident, node, include_labels=True):
     d = dict(id=ident,
-         color="#EEEEEC" if node.get("artificial") else "#729FCF")
+             color="#EEEEEC" if node.get("artificial") else "#729FCF")
     d["title"] = node["lbl"]
     if include_labels:
         d["label"] = node["lbl"]
@@ -79,34 +44,51 @@ def _build_node(ident, node, include_labels=True):
     return d
 
 
-def nx_to_graph(g: nx.Graph):
-    return dict(
-        nodes={n: g.nodes[n] for n in g.nodes},
-        edges=list(g.edges)
-    )
-
-
-def batchify(l):
-    cache = []
-    for r in l:
-        cache.append(r)
-        if len(cache) >= BATCH_SIZE:
-            yield cache
-            cache = []
-    if cache:
-        yield cache
-
-
-def calculate_results(batch):
-    collater = RaggedCollater()
-    dat = electra_model._process_batch(collater(batch).to(electra_model.device), 0)
-    dat["features"] = dat["features"].int()
-    return electra_model(dat, **dat["model_kwargs"])
+def nx_to_graph(g: nx.Graph, colors=None):
+    results = {
+        "nodes": {n: g.nodes[n] for n in g.nodes},
+        "edges": list(g.edges)
+    }
+    if colors is not None:
+        results["node_colors"] = dict()
+        for node, color in colors.items():
+            if node in results["nodes"]:
+                results["node_colors"][node] = color
+    return results
 
 
 class HierarchyAPI(Resource):
     def get(self):
-        return {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses",[])) for r in LABEL_HIERARCHY}
+        return {
+            "available_models": [model.name for model in AVAILABLE_MODELS],
+            "available_models_info_texts": [model.info_text for model in AVAILABLE_MODELS],
+            "hierarchy": {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses", [])) for r in LABEL_HIERARCHY}
+        }
+
+class ModelInfoAPI(Resource):
+
+    def get(self):
+        return {
+            "available_models": [model.name for model in AVAILABLE_MODELS],
+            "available_models_info_texts": [model.info_text for model in AVAILABLE_MODELS]
+        }
+
+def verify_disjointness(predicted_classes):
+    disjoints = []
+    with open(os.path.join("data", "disjoint_chebi.csv")) as f:
+        for line in f:
+            disjoints.append([f"CHEBI:{i}" for i in line.strip().split(",")])
+    with open(os.path.join("data", "disjoint_additional.csv")) as f:
+        for line in f:
+            disjoints.append([f"CHEBI:{i}" for i in line.strip().split(",")])
+    violations = []
+    for sample in predicted_classes:
+        violations_sample = []
+        for disjoint in disjoints:
+            if all(cls in sample for cls in disjoint):
+                violations_sample.append(disjoint)
+        violations.append(violations_sample)
+    return violations
 
 
 class BatchPrediction(Resource):
@@ -118,68 +100,69 @@ class BatchPrediction(Resource):
             "ontology": bool (Optional)
         }
         :return:
-        A dictionary wit hthe following structure
+        A dictionary with the following structure
         {
             "predicted_parents": [ ... [... parent classes as predicted by the system] or None for each smiles ],
             "direct_parents": [ ... [... lowest possible predicted parents] or None for each smiles ] or None
-            "ontology": Only returened if `ontology` is set. Returns a vis.js conform representation of the ontology containing all predicted classes.
+            "ontology": Only returned if `ontology` is set. Returns a vis.js conform representation of the ontology containing all predicted classes.
         }
 
         If the system us unable to parse any smiles string, the respective entry in each list will be `None`.
         """
-
         parser = reqparse.RequestParser()
         parser.add_argument("smiles", type=str, action="append")
         parser.add_argument("ontology", type=bool, required=False, default=False)
+        parser.add_argument("selectedModels", type=dict)
         args = parser.parse_args()
         smiles = args["smiles"]
         generate_ontology = args["ontology"]
+        selected_models = args["selectedModels"]
 
-        reader = ChemDataReader()
-        collater = RaggedCollater()
-        token_dicts = []
-        could_not_parse = []
-        index_map = dict()
-        for i, s in enumerate(smiles):
-            try:
-                # Try to parse the smiles string
-                if not s:
-                    raise ValueError()
-                d = reader.to_data(dict(features=s, labels=None))
-                # This is just for sanity checks
-                rdmol = Chem.MolFromSmiles(s, sanitize=False)
-            except Exception as e:
-                # Note if it fails
-                could_not_parse.append(i)
-            else:
-                if rdmol is None:
-                    could_not_parse.append(i)
-                else:
-                    index_map[i] = len(token_dicts)
-                    token_dicts.append(d)
-        results = []
-        if token_dicts:
-            for batch in batchify(token_dicts):
-                result = calculate_results(batch)
-                results += result["logits"].cpu().detach().tolist()
+        predicted_classes = [[] for _ in smiles]
+        for model in AVAILABLE_MODELS:
+            if model.name in selected_models.keys() and selected_models[model.name]:
+                new_preds = model.predict(smiles)
+                for i in range(len(smiles)):
+                    if new_preds[i] is not None:
+                        predicted_classes[i] += new_preds[i]
 
-            chebi, predicted_parents = get_relevant_chebi_fragment(np.stack(results, axis=0), smiles)
-        else:
-            chebi, predicted_parents = ([], [])
+        all_predicted = get_transitive_predictions(predicted_classes)
 
+        predicted_graph = CHEBI_FRAGMENT.subgraph(all_predicted)
+        graphs_per_smiles = [CHEBI_FRAGMENT.subgraph(predicted) for predicted in predicted_classes]
+
+        direct_parents = [[cls for cls in graph.nodes if not any(predecessor in graph.nodes
+                                                                 for predecessor in graph.predecessors(cls))]
+                          for graph in graphs_per_smiles]
+
+        # array with dimensions [n_samples, n_violations, 2]
+        violations = verify_disjointness(predicted_classes)
+        # replace the violation-causing classes with the direct predictions that are influenced by them
+        violations_direct = [[[{v: [direct_pred for direct_pred in direct_preds
+                       if direct_pred == v or nx.has_path(graph_smiles,direct_pred, v)]
+                               for v in violation}] for violation in violations_sample]
+                      for violations_sample, direct_preds, graph_smiles in zip(violations, direct_parents, graphs_per_smiles)]
         result = {
-            "predicted_parents": [(None if i in could_not_parse else predicted_parents[index_map[i]]) for i in range(len(smiles))],
-            "direct_parents": [(None if i in could_not_parse else list(chebi.successors(index_map[i]))) for i in range(len(smiles))],
-
+            "predicted_parents": predicted_classes,
+            "direct_parents": direct_parents,
+            "violations": violations_direct
         }
 
         if generate_ontology:
-            result["ontology"] = nx_to_graph(chebi)
+            #violation_colors = {violator: "#d92946" for violations_sample in violations for violation in violations_sample for violator in violation}
+            result["ontology"] = nx_to_graph(predicted_graph)
 
         return result
 
 
+def to_color(model_name):
+    # turn any string into a color
+    h = hashlib.md5(model_name.encode()).hexdigest()
+    return "#" + h[:6]
+
+
 class PredictionDetailApiHandler(Resource):
+
     def load_image(self, path):
         im = Image.open(path)
         data = io.BytesIO()
@@ -187,75 +170,48 @@ class PredictionDetailApiHandler(Resource):
         encoded_img_data = base64.b64encode(data.getvalue())
         return encoded_img_data.decode("utf-8")
 
-    def build_graph_from_attention(self, att, node_labels, token_labels, threshold=0.0):
-        n_nodes = len(node_labels)
-        return dict(
-            nodes=[
-                dict(
-                    label=token_labels[n],
-                    id=f"{group}_{i}",
-                    fixed=dict(x=True, y=True),
-                    y=100 * int(group == "r"),
-                    x=30 * i,
-                    group=group,
-                )
-                for i, n in enumerate([0] + node_labels)
-                for group in ("l", "r")
-            ],
-            edges=[
-                {
-                    "from": f"l_{i}",
-                    "to": f"r_{j}",
-                    "color": {"opacity": att[i, j].item()},
-                    "smooth": False,
-                    "physics": False,
-                }
-                for i in range(n_nodes)
-                for j in range(n_nodes)
-                if att[i, j] > threshold
-            ],
-        )
-
-
-
-
-
     def post(self):
         parser = reqparse.RequestParser()
-        plotter = AttentionMolPlot()
-        network_plotter = AttentionNetwork()
         parser.add_argument("type", type=str)
         parser.add_argument("smiles", type=str)
+        parser.add_argument("selectedModels", type=dict)
 
         args = parser.parse_args()
-
         # note, the post req from frontend needs to match the strings here (e.g. 'type and 'message')
-
         request_type = args["type"]
         smiles = args["smiles"]
+        selected_models = args["selectedModels"]
 
-        reader = ChemDataReader()
-        token_dict = reader.to_data(dict(features=smiles, labels=None))
-        tokens = np.array(token_dict["features"]).astype(int).tolist()
-        result = calculate_results([token_dict])
+        predicted_classes = []
+        predicted_by_model = {}
+        explain_infos = {"models": {}}
+        for model in AVAILABLE_MODELS:
+            if model.name in selected_models.keys() and selected_models[model.name]:
+                explain_infos_model = model.explain(smiles)
+                pred = model.predict([smiles])[0]
+                if pred is not None:
+                    predicted_classes += pred
+                    predicted_by_model[model.name] = pred
+                if explain_infos_model is not None:
+                    explain_infos_model["model_type"] = model.default_name
+                    explain_infos_model["model_info"] = model.info_text
+                    explain_infos["models"][model.name] = explain_infos_model
 
-        token_labels = (
-            ["[CLR]"] + [None for _ in range(EMBEDDING_OFFSET - 1)] + reader.cache
-        )
+        all_predicted = get_transitive_predictions([predicted_classes])
+        chebi = CHEBI_FRAGMENT.subgraph(all_predicted)
 
-        graphs = [
-            [
-                self.build_graph_from_attention(
-                    a[0, i], tokens, token_labels, threshold=0.1
-                )
-                for i in range(a.shape[1])
-            ]
-            for a in result["attentions"]
-        ]
+        predicted_by_per_node = {cls: [] for cls in all_predicted}
+        for model_name, nodes in predicted_by_model.items():
+            for node in nodes:
+                predicted_by_per_node[node].append(model_name)
+        node_colors = {node: to_color(str(predicted_by_per_node[node])) for node in all_predicted
+                       }
+        color_legend = {
+            to_color(str(preds)): " and ".join(preds) if len(preds) > 0 else "Inferred based on predicted subclasses"
+            for preds in predicted_by_per_node.values()}
 
-        chebi, predicted_parents = get_relevant_chebi_fragment(result["logits"].detach().cpu().numpy(), [smiles])
-
-        with NamedTemporaryFile(mode="wt", suffix=".png") as svg1:
+        # todo replace with smiles (and paint with rdkit-js)
+        with open("image.png", mode="wt") as svg1:
             rdmol = Chem.MolFromSmiles(smiles)
             d = rdMolDraw2D.MolDraw2DCairo(500, 500)
             rdMolDraw2D.PrepareAndDrawMolecule(d, rdmol)
@@ -263,8 +219,15 @@ class PredictionDetailApiHandler(Resource):
             d.WriteDrawingText(svg1.name)
             mol_pic = self.load_image(svg1.name)
 
-        return {
-            "figures": {"plain_molecule": mol_pic},
-            "graphs": graphs,
-            "classification": nx_to_graph(chebi)
-        }
+        explain_infos["figures"] = {"plain_molecule": mol_pic}
+        explain_infos["classification"] = nx_to_graph(chebi, node_colors)
+        explain_infos["color_legend"] = color_legend
+
+        return explain_infos
+
+
+if __name__ == "__main__":
+    gnn = AVAILABLE_MODELS[2]
+    print(gnn)
+    smiles = "[F-].[H][N+]([H])([H])[H]"
+    print(gnn.read_smiles(smiles))
