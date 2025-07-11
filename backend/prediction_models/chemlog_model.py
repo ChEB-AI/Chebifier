@@ -1,14 +1,11 @@
 from typing import Optional
 
-import sys
-import os
-sys.path.append(os.path.join("..", "..", "..", "PycharmProjects", "chemlog2"))
 import chemlog
 
-from chemlog.classification.charge_classifier import get_charge_category, ChargeCategories
-from chemlog.classification.peptide_size_classifier import get_n_amino_acid_residues
-from chemlog.classification.proteinogenics_classifier import get_proteinogenic_amino_acids
-from chemlog.classification.substructure_classifier import is_emericellamide, is_diketopiperazine
+from chemlog.alg_classification.charge_classifier import get_charge_category, ChargeCategories
+from chemlog.alg_classification.peptide_size_classifier import get_n_amino_acid_residues
+from chemlog.alg_classification.proteinogenics_classifier import get_proteinogenic_amino_acids
+from chemlog.alg_classification.substructure_classifier import is_emericellamide, is_diketopiperazine
 from chemlog.cli import resolve_chebi_classes
 
 from rdkit import Chem

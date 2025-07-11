@@ -116,7 +116,7 @@ function EditToolbar(props) {
         event.preventDefault();
         const reader = new FileReader()
         reader.onload = async (e) => {
-            addRows(e.target.result.split("\n"))
+            addRows(e.target.result.trim().replace(/\r/g, "").split("\n"))
         };
         reader.readAsText(event.target.files[0])
     };
@@ -234,7 +234,7 @@ export default function ClassificationGrid() {
                 		const this_violation = violations[i][0];
                 		var children_str = [];
 						for (const [violated_cls, children] of Object.entries(this_violation)) {
-							children_str.push(`${children.map(v => hierarchy[v].label).join(', ')} ${(children.length != 1) ? "are subclasses" : "is a subclass"} of ${hierarchy[violated_cls].label}`);
+							children_str.push(`${children.map(v => hierarchy[v].label).join(', ')} ${(children.length !== 1) ? "are subclasses" : "is a subclass"} of ${hierarchy[violated_cls].label}`);
 						}
                 		for (const [violated_cls, children] of Object.entries(this_violation)) {
                 			if (children.includes(x)) {
@@ -361,6 +361,14 @@ export default function ClassificationGrid() {
       <div className="App">
         <header className="App-header">
         <Box sx={{width: "100%"}}>
+
+            <Box sx={{ padding: 2, backgroundColor: '#f0f0f0', marginBottom: 2, borderRadius: 1, marginLeft: 2, marginRight: 2 }}>
+                <Typography variant="h6" align="left" color="textPrimary" gutterBottom>
+                    If you like Chebifier, please cite: Glauer, Martin, et al. "Chebifier: Automating Semantic
+                    Classification in ChEBI to Accelerate Data-driven Discovery."
+                    <a href={"https://pubs.rsc.org/en/content/articlehtml/2024/dd/d3dd00238a"}>Digital Discovery, 2024, 3, 896</a>.
+                </Typography>
+            </Box>
 
             <Paper sx={{width: "100%"}}>
                 <Box

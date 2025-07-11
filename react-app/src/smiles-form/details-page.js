@@ -62,9 +62,9 @@ export function DetailsPerModel(data) {
 			{Object.entries(models_info).map(([model_name, model_data]) => (
 				<Box>
 					<h2>Insights for {model_name}:</h2>
-					{model_data.model_type === "ELECTRA" ? (
+					{model_data.model_type === "ElectraPredictor" ? (
 						<DetailsElectra model_data={model_data} />
-					) : model_data.model_type === "ChemLog Peptides" ? (
+					) : model_data.model_type === "ChemLogPredictor" ? (
 						<DetailsChemlog model_data={model_data} />
 					) : (
 						<Typography>Model type {model_data.model_type} is not supported for explanations.</Typography>
@@ -102,7 +102,7 @@ export default function DetailsPage(data) {
                                 <Typography><h2>Molecular structure</h2></Typography>
                                 <div style={{
                                     display: 'flex',
-                                    alignItems: 'center',
+                                    alignItems: 'left',
                                     justifyContent: 'center',
                                 }}>
                                 <img src={`data:image/jpeg;base64,${data.plain_molecule}`} width="300" height="300"/></div>
@@ -110,8 +110,19 @@ export default function DetailsPage(data) {
                             <Box>
                                 <Typography><h2>ChEBI Classification</h2></Typography>
                                 <Typography><h3>What am I seeing?</h3>
-                                    The graph below shows you the position in the ChEBI ontology that our system
-                                    proposed. If multiple prediction methods were used, the color indicates by which
+                                    Chebifier uses an <i>Ensemble</i> of Machine Learning (ML) and rule-based methods for
+                                    each class. The ensemble prediction is influenced by several factors:
+                                    <ol>
+                                        <li>Trust: We are testing our ML models on a validation set. If they achieve a high F1-score for a given class, we trust them more.
+                                            The rule-based methods have a higher trust than the ML models.</li>
+                                        <li>Confidence: The ML models can report themselves if they are sure of their prediction for a given class and sample.
+                                            If a model is very sure of its prediction, we will give it more weight.</li>
+                                        <li>Logical consistency: ChEBI has logical relations between classes that we can use.
+                                            For instance, <a target="_blank" rel="noopener noreferrer" href={"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:25699"}>organic ion</a> is a subclass of <a target="_blank" rel="noopener noreferrer" href={"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:50860"}>organic molecular entity</a>.
+                                            Therefore, if the ensemble predicts organic ion, but not organic molecular entity, this will be corrected. Similarly, disjoint relations
+                                            (e.g., a molecule cannot be an organic cation and an organic anion) are resolved automatically.</li>
+                                    </ol>
+                                    In the graph below, the color indicates by which
                                     method each prediction has been made.</Typography>
                                 <Typography><b>Legend</b></Typography>
                                 <Legend colors={data.chebi_legend} />
