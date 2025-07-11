@@ -123,17 +123,17 @@ class BatchPrediction(Resource):
 
         all_predicted = selected_ensemble.predict_smiles_list(smiles, load_preds_if_possible=False)
 
-        all_predicted = [[f"CHEBI:{cls}" for cls in sample if cls is not None] for sample in all_predicted]
+        all_predicted = [[f"CHEBI:{cls}" for cls in sample if cls is not None] if sample is not None else None for sample in all_predicted]
 
-        predicted_graph = CHEBI_FRAGMENT.subgraph([p for sample in all_predicted for p in sample])
-        graphs_per_smiles = [CHEBI_FRAGMENT.subgraph(predicted) for predicted in all_predicted]
+        predicted_graph = CHEBI_FRAGMENT.subgraph([p for sample in all_predicted if sample is not None for p in sample])
+        graphs_per_smiles = [CHEBI_FRAGMENT.subgraph(predicted) if predicted else None for predicted in all_predicted]
 
         direct_parents = [[cls for cls in graph.nodes if not any(predecessor in graph.nodes
-                                                                 for predecessor in graph.predecessors(cls))]
+                                                                 for predecessor in graph.predecessors(cls))] if graph is not None else None
                           for graph in graphs_per_smiles]
 
         # array with dimensions [n_samples, n_violations, 2]
-        violations = verify_disjointness(all_predicted)
+        violations = verify_disjointness([p for p in all_predicted if p is not None])
         # replace the violation-causing classes with the direct predictions that are influenced by them
         violations_direct = [[[{v: [direct_pred for direct_pred in direct_preds
                                     if direct_pred == v or nx.has_path(graph_smiles, direct_pred, v)]
@@ -145,11 +145,9 @@ class BatchPrediction(Resource):
             "direct_parents": direct_parents,
             "violations": violations_direct
         }
-
         if generate_ontology:
             # violation_colors = {violator: "#d92946" for violations_sample in violations for violation in violations_sample for violator in violation}
             result["ontology"] = nx_to_graph(predicted_graph)
-
         return result
 
 

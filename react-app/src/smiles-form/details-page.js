@@ -118,8 +118,7 @@ export default function DetailsPage(data) {
                                         <li>Confidence: The ML models can report themselves if they are sure of their prediction for a given class and sample.
                                             If a model is very sure of its prediction, we will give it more weight.</li>
                                         <li>Logical consistency: ChEBI has logical relations between classes that we can use.
-                                            For instance, <a target="_blank" rel="noopener noreferrer" href={"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:25699"}>organic ion</a>
-                                            is a subclass of <a target="_blank" rel="noopener noreferrer" href={"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:50860"}>organic molecular entity</a>.
+                                            For instance, <a target="_blank" rel="noopener noreferrer" href={"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:25699"}>organic ion</a> is a subclass of <a target="_blank" rel="noopener noreferrer" href={"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:50860"}>organic molecular entity</a>.
                                             Therefore, if the ensemble predicts organic ion, but not organic molecular entity, this will be corrected. Similarly, disjoint relations
                                             (e.g., a molecule cannot be an organic cation and an organic anion) are resolved automatically.</li>
                                     </ol>
