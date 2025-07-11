@@ -117,11 +117,12 @@ class BatchPrediction(Resource):
         smiles = args["smiles"]
         generate_ontology = args["ontology"]
         selected_models = args["selectedModels"]
+        ensemble_models = ENSEMBLE.models
+        ENSEMBLE.models = [model for model in ensemble_models if model.model_name in selected_models and selected_models[model.model_name]]
 
-        selected_ensemble = copy.deepcopy(ENSEMBLE)
-        selected_ensemble.models = [model for model in selected_ensemble.models if model.model_name in selected_models]
+        all_predicted = ENSEMBLE.predict_smiles_list(smiles, load_preds_if_possible=False)
 
-        all_predicted = selected_ensemble.predict_smiles_list(smiles, load_preds_if_possible=False)
+        ENSEMBLE.models = ensemble_models  # restore original model list
 
         all_predicted = [[f"CHEBI:{cls}" for cls in sample if cls is not None] if sample is not None else None for sample in all_predicted]
 
@@ -181,16 +182,15 @@ class PredictionDetailApiHandler(Resource):
         predicted_classes = []
         predicted_by_model = {}
         explain_infos = {"models": {}}
-        selected_ensemble = copy.deepcopy(ENSEMBLE)
-        selected_ensemble.models = [model for model in selected_ensemble.models if model.model_name in selected_models]
-
-        for model in selected_ensemble.models:
+        ensemble_models = ENSEMBLE.models
+        ENSEMBLE.models = [model for model in ensemble_models if model.model_name in selected_models and selected_models[model.model_name]]
+        for model in ENSEMBLE.models:
             pred = model.predict_smiles_list([smiles])[0]
-            pred = [f"CHEBI:{cls}" for cls in pred if cls is not None and pred[cls] > selected_ensemble.positive_prediction_threshold]
+            pred = [f"CHEBI:{cls}" for cls in pred if cls is not None and pred[cls] > ENSEMBLE.positive_prediction_threshold]
             if pred is not None:
                 predicted_classes += pred
                 predicted_by_model[model.model_name] = pred
-        for model in selected_ensemble.models:
+        for model in E.models:
             explain_infos_model = model.explain_smiles(smiles)
             print(f"Explain infos for {model.model_name}: {explain_infos_model}")
             if explain_infos_model is not None:
@@ -199,7 +199,8 @@ class PredictionDetailApiHandler(Resource):
                 explain_infos["models"][model.model_name] = explain_infos_model
 
         # add ensemble predictions as own model
-        pred = selected_ensemble.predict_smiles_list([smiles], load_preds_if_possible=False)[0]
+        pred = ENSEMBLE.predict_smiles_list([smiles], load_preds_if_possible=False)[0]
+        ENSEMBLE.models = ensemble_models # restore original models
         pred = [f"CHEBI:{cls}" for cls in pred if cls is not None]
         if pred is not None:
             predicted_classes += pred
