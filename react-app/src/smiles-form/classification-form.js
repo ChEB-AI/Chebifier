@@ -116,7 +116,7 @@ function EditToolbar(props) {
         event.preventDefault();
         const reader = new FileReader()
         reader.onload = async (e) => {
-            addRows(e.target.result.split("\n"))
+            addRows(e.target.result.trim().replace(/\r/g, "").split("\n"))
         };
         reader.readAsText(event.target.files[0])
     };
