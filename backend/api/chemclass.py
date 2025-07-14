@@ -190,9 +190,8 @@ class PredictionDetailApiHandler(Resource):
             if pred is not None:
                 predicted_classes += pred
                 predicted_by_model[model.model_name] = pred
-        for model in E.models:
+        for model in ENSEMBLE.models:
             explain_infos_model = model.explain_smiles(smiles)
-            print(f"Explain infos for {model.model_name}: {explain_infos_model}")
             if explain_infos_model is not None:
                 explain_infos_model["model_type"] = model.__class__.__name__
                 explain_infos_model["model_info"] = model.info_text
