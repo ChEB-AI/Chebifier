@@ -124,13 +124,13 @@ export function HighlightsBlocks(data) {
     	var block_content = blocks[i][1];
 
 
-    	if (block_type == "text") {
+    	if (block_type === "text") {
 			blocks_content.push(
 				<Box>
 					<Typography>{block_content}</Typography>
 				</Box>
 			);
-		} else if (block_type == "single") {
+		} else if (block_type === "single") {
 			var mdetails = {...GLOBAL_MOL_PARAMS};
 			mdetails["atoms"] = block_content;
 			var svg_mol = data.mol.get_svg_with_highlights(JSON.stringify(mdetails));
@@ -140,7 +140,7 @@ export function HighlightsBlocks(data) {
 				</Box>
 			);
 
-		} else if (block_type == "tabs") {
+		} else if (block_type === "tabs") {
 			var layers = [];
 			for (const[key, value] of Object.entries(block_content)) {
 				layers.push({name: key, highlights: value});
@@ -149,7 +149,7 @@ export function HighlightsBlocks(data) {
 			blocks_content.push(
 				<LayerTabs layers={layers} mol={data.mol}/>
 			);
-		} else if (block_type == "heading") {
+		} else if (block_type === "heading") {
 			blocks_content.push(
 				<Box>
 					<h3>{block_content}</h3>
@@ -164,23 +164,20 @@ export function HighlightsBlocks(data) {
 }
 
 
-export function DetailsChemlog(data) {
+export function DetailsBlockwise(data) {
     const handleClose = data.handleClose;
     data = data.model_data;
 
     var smiles = data.smiles
-  	var mol = window.RDKit.get_mol(smiles);
-  	var svg_mol = mol.get_svg_with_highlights(JSON.stringify(GLOBAL_MOL_PARAMS));
-  	svg_mol = svg_mol.substring(svg_mol.indexOf("<svg"));
+    var mol = null;
+    if (!(smiles === null || smiles === undefined)) {
+        mol = window.RDKit.get_mol(smiles);
+    }
+  	//var svg_mol = mol.get_svg_with_highlights(JSON.stringify(GLOBAL_MOL_PARAMS));
+  	//svg_mol = svg_mol.substring(svg_mol.indexOf("<svg"));
 
     return (
         <Box>
-			<Typography>
-				<h3>What am I seeing?</h3>
-				Results for peptides and peptide-related classes (e.g. peptide anion, depsipeptide) have been calculated
-				with a rule-based system. The following shows which parts of the molecule were identified as relevant
-				structures and have influenced the classification.
-			</Typography>
 			<HighlightsBlocks highlights={data.highlights} mol={mol}/>
 		</Box>
     )
