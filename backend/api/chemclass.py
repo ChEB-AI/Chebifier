@@ -181,8 +181,8 @@ class PredictionDetailApiHandler(Resource):
         ENSEMBLE.models = [model for model in ensemble_models if model.model_name in selected_models and selected_models[model.model_name]]
         for model in ENSEMBLE.models:
             pred = model.predict_smiles_list([smiles])[0]
-            pred = [f"CHEBI:{cls}" for cls in pred if cls is not None and pred[cls] > ENSEMBLE.positive_prediction_threshold]
             if pred is not None:
+                pred = [f"CHEBI:{cls}" for cls in pred if pred[cls] > ENSEMBLE.positive_prediction_threshold]
                 predicted_classes += pred
                 predicted_by_model[model.model_name] = pred
         for model in ENSEMBLE.models:
@@ -195,8 +195,8 @@ class PredictionDetailApiHandler(Resource):
         # add ensemble predictions as own model
         pred = ENSEMBLE.predict_smiles_list([smiles], load_preds_if_possible=False)[0]
         ENSEMBLE.models = ensemble_models # restore original models
-        pred = [f"CHEBI:{cls}" for cls in pred if cls is not None]
         if pred is not None:
+            pred = [f"CHEBI:{cls}" for cls in pred if cls is not None]
             predicted_classes += pred
             predicted_by_model["Ensemble"] = pred
 
