@@ -273,8 +273,6 @@ export default function ClassificationGrid() {
     const [open, setOpen] = React.useState(false);
     const handleOpen = (id) => () => {
         const thisRow = rows.find((row) => row.id === id);
-        console.log(selectedModels);
-        console.log(thisRow);
         axios.post('/api/details', {smiles: thisRow.smiles, selectedModels: selectedModels}).then(response => {
             setDetail({
                 plain_molecule: response.data.figures.plain_molecule,
