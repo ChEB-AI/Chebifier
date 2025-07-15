@@ -27,7 +27,7 @@ import {styled} from '@mui/material/styles';
 
 import {plot_ontology} from "./ontology-utils";
 import {DetailsElectra} from "./details-electra";
-import {DetailsChemlog} from "./details-page-chemlog";
+import {DetailsBlockwise} from "./details-page-chemlog";
 
 
 
@@ -64,10 +64,8 @@ export function DetailsPerModel(data) {
 					<h2>Insights for {model_name}:</h2>
 					{model_data.model_type === "ElectraPredictor" ? (
 						<DetailsElectra model_data={model_data} />
-					) : model_data.model_type === "ChemLogPredictor" ? (
-						<DetailsChemlog model_data={model_data} />
 					) : (
-						<Typography>Model type {model_data.model_type} is not supported for explanations.</Typography>
+						<DetailsBlockwise model_data={model_data} />
 					)}
 				</Box>
 			))
