@@ -17,11 +17,6 @@ import hashlib
 
 from chebifier.ensemble.base_ensemble import BaseEnsemble
 
-# not used directly, but will be resolved by AVAILABLE_MODELS
-from prediction_models.electra_model import ElectraModel
-from prediction_models.chemlog_model import ChemLog
-from prediction_models.gnn_resgated_model import GNNResGated
-
 mpl.use("Agg")
 
 if torch.cuda.is_available():
