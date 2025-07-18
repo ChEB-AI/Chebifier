@@ -50,11 +50,17 @@ const About = () => {
 						Chebifier is a tool for automated classification of chemicals in the <Link href="https://www.ebi.ac.uk/chebi/">ChEBI</Link> ontology.
                         <br/>
 						To run a prediction, add a new row using "ADD SMILES" and enter a SMILES string or upload a file. Then,
-						start the prediction with "PREDICT CLASSES". You can get additional insights by clicking on the light bulb icon.
+						start the prediction with "PREDICT CLASSES". You can get additional insights by clicking on the light bulb icon on the right-hand side.
                         <br/>
-						At the moment, the following prediction models are supported by Chebifier. You can switch between predictions models using the buttons at the bottom of the classification page.
+                        </Text>
+                        <h3>The model</h3>
+                        <Text>
+                            Chebifier uses an ensemble of machine learning models and rule-based methods to classify molecules into ChEBI classes. Details about the ensemble and the implementation can be found <Link href="https://github.com/ChEB-AI/python-chebifier">here</Link>.
+						    At the moment, the following prediction models are supported by Chebifier. You can select specific models using the buttons at the bottom of the classification page.
 						{modelList}
-                            <h2>Main Publication for Chebifier</h2>
+                        </Text>
+                            <h3>Main Publication for Chebifier</h3>
+                        <Text>
                             Glauer, Martin, et al.: Chebifier: Automating Semantic Classification in ChEBI to Accelerate
                             Data-driven Discovery; Digital Discovery 3.5 (2024), <Link
                             href="https://doi.org/10.1039/D3DD00238A">Link</Link>
