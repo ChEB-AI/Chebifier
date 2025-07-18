@@ -15,7 +15,7 @@ import torch
 from chebi_utils import LABEL_HIERARCHY, CHEBI_FRAGMENT, get_transitive_predictions
 import hashlib
 
-from chebifier.ensemble.base_ensemble import BaseEnsemble
+from chebifier.ensemble.weighted_majority_ensemble import WMVwithF1Ensemble
 
 mpl.use("Agg")
 
@@ -24,7 +24,7 @@ if torch.cuda.is_available():
 else:
     device = "cpu"
 
-ENSEMBLE = BaseEnsemble(app.config["MODELS"])
+ENSEMBLE = WMVwithF1Ensemble(app.config["MODELS"])
 
 
 def _build_node(ident, node, include_labels=True):
