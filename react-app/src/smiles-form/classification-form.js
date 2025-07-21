@@ -42,6 +42,7 @@ import {
 
 import DetailsPage from "./details-page";
 import {plot_ontology} from "./ontology-utils";
+import {CircularProgress} from "@mui/material";
 
 const RenderDate = (props) => {
   const { hasFocus, value } = props;
@@ -97,6 +98,8 @@ const Checkbox = ({label, value, onChange, checked=true}) => {
 function EditToolbar(props) {
     const {setRows, setRowModesModel, rows, getLabel, setOntology, selectedModels} = props;
 
+    const [predictionsLoading, setPredictionsLoading] = React.useState(false);
+
     const addRows = ((smiles) => {
             const ids = smiles.map((s) => randomId());
             setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id: ids[i], smiles: s, direct_parents: [], predicted_parents: []}))]);
@@ -133,6 +136,7 @@ function EditToolbar(props) {
     };
 
     const handleRun = () => {
+        setPredictionsLoading(true);
         axios({
             url: '/api/classify',
             method: 'post',
@@ -146,6 +150,8 @@ function EditToolbar(props) {
                 ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i], "violations": response.data.violations[i]
             })));
             setOntology(response.data.ontology)
+        }).finally(() => {
+            setPredictionsLoading(false);
         });
     };
 
@@ -165,7 +171,7 @@ function EditToolbar(props) {
                 />
             </Button>
             <Divider/>
-            <Button color="primary" startIcon={<StartIcon/>} onClick={handleRun}>
+            <Button color="primary" startIcon={predictionsLoading ? <CircularProgress size={20}/> : <StartIcon/>} onClick={handleRun} disabled={predictionsLoading}>
                 Predict classes
             </Button>
             <Button color="primary" startIcon={<FileDownloadIcon/>} onClick={handleDownload} disabled={rows.filter((d) => d.direct_parents?.length > 0).length === 0}>
@@ -271,8 +277,10 @@ export default function ClassificationGrid() {
     };
 
     const [open, setOpen] = React.useState(false);
+    const [detailsLoading, setDetailsLoading] = React.useState(false);
     const handleOpen = (id) => () => {
         const thisRow = rows.find((row) => row.id === id);
+        setDetailsLoading(thisRow.id);
         axios.post('/api/details', {smiles: thisRow.smiles, selectedModels: selectedModels}).then(response => {
             setDetail({
                 plain_molecule: response.data.figures.plain_molecule,
@@ -281,6 +289,8 @@ export default function ClassificationGrid() {
                 chebi_legend: response.data.color_legend
             });
             setOpen(true);
+        }).finally(() => {
+            setDetailsLoading(false);
         });
 
     }
@@ -334,11 +344,11 @@ export default function ClassificationGrid() {
 
                 return [
                 	<GridActionsCellItem
-                        icon={<LightbulbIcon/>}
+                        icon={detailsLoading === id ? <CircularProgress size={20}/> : <LightbulbIcon/>}
                         label="Details"
                         onClick={handleOpen(id)}
                         color="inherit"
-                        disabled={!wasPredicted}
+                        disabled={!wasPredicted || detailsLoading !== false}
                     />,
                     <GridActionsCellItem
                         icon={<DeleteIcon/>}
