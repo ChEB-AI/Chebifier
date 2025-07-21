@@ -180,7 +180,7 @@ class PredictionDetailApiHandler(Resource):
         ensemble_models = ENSEMBLE.models
         ENSEMBLE.models = [model for model in ensemble_models if model.model_name in selected_models and selected_models[model.model_name]]
         for model in ENSEMBLE.models:
-            pred = model.predict_smiles_list([smiles])[0]
+            pred = model.predict_smiles(smiles)
             if pred is not None:
                 pred = [f"CHEBI:{cls}" for cls in pred if pred[cls] > ENSEMBLE.positive_prediction_threshold]
                 predicted_classes += pred
