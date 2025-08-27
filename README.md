@@ -1,6 +1,6 @@
 # Chebifier
 
-Chebifier is a tool for automated classification of chemicals in the (ChEBI)[https://www.ebi.ac.uk/chebi/] ontology.
+Chebifier is a tool for automated classification of chemicals in the [ChEBI](https://www.ebi.ac.uk/chebi/) ontology.
 
 ## Installation
 
@@ -51,5 +51,5 @@ The server should now run at [localhost:5000](localhost:5000)
 ## Citation
 
 If you found Chebifier useful, please cite: 
-(Martin Glauer, Fabian Neuhaus, Simon Flügel, Marie Wosny, Till Mossakowski, Adel Memariani, Johannes Schwerdt and Janna Hastings "Chebifier: Automating Semantic Classification in ChEBI to Accelerate Data-driven Discovery."Digital Discovery, 2024, 3, 896.)[https://pubs.rsc.org/en/content/articlehtml/2024/dd/d3dd00238a]
+[Martin Glauer, Fabian Neuhaus, Simon Flügel, Marie Wosny, Till Mossakowski, Adel Memariani, Johannes Schwerdt and Janna Hastings "Chebifier: Automating Semantic Classification in ChEBI to Accelerate Data-driven Discovery."Digital Discovery, 2024, 3, 896.](https://pubs.rsc.org/en/content/articlehtml/2024/dd/d3dd00238a)
 
