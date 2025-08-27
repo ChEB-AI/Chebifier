@@ -1,6 +1,10 @@
-# Installation
+# Chebifier
 
-## Setup Backend
+Chebifier is a tool for automated classification of chemicals in the (ChEBI)[https://www.ebi.ac.uk/chebi/] ontology.
+
+## Installation
+
+### Setup Backend
 
 Some dependencies require that pytorch is already installed:
 
@@ -23,7 +27,7 @@ and change the path for each setting according to your setup.
 
 
 
-## Setup Frontend
+### Setup Frontend
 
 Change to the respective directory and build the node.js files
 ```
@@ -31,7 +35,7 @@ cd react-app
 npm run build
 ```
 
-## Run in development
+### Run in development
 
 You can now start the development server with 
 
@@ -41,3 +45,11 @@ flask run
 ```
 
 The server should now run at [localhost:5000](localhost:5000)
+
+## What's New?
+
+## Citation
+
+If you found Chebifier useful, please cite: 
+(Martin Glauer, Fabian Neuhaus, Simon Flügel, Marie Wosny, Till Mossakowski, Adel Memariani, Johannes Schwerdt and Janna Hastings "Chebifier: Automating Semantic Classification in ChEBI to Accelerate Data-driven Discovery."Digital Discovery, 2024, 3, 896.)[https://pubs.rsc.org/en/content/articlehtml/2024/dd/d3dd00238a]
+
