@@ -115,6 +115,17 @@ class BatchPrediction(Resource):
         ensemble_models = ENSEMBLE.models
         ENSEMBLE.models = [model for model in ensemble_models if model.model_name in selected_models and selected_models[model.model_name]]
 
+        if not smiles or len(smiles) == 0:
+            result = {
+                "predicted_parents": [],
+                "direct_parents": [],
+                "violations": []
+            }
+            if generate_ontology:
+                # violation_colors = {violator: "#d92946" for violations_sample in violations for violation in violations_sample for violator in violation}
+                result["ontology"] = nx_to_graph(CHEBI_FRAGMENT.subgraph([]))
+            return result
+
         all_predicted = ENSEMBLE.predict_smiles_list(smiles, load_preds_if_possible=False)
 
         ENSEMBLE.models = ensemble_models  # restore original model list
