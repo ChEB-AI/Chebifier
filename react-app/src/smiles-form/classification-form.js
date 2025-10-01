@@ -96,7 +96,7 @@ const Checkbox = ({label, value, onChange, checked=true}) => {
 
 
 function EditToolbar(props) {
-    const {setRows, setRowModesModel, rows, getLabel, setOntology, selectedModels} = props;
+    const {setRows, setRowModesModel, rows, setOntology, selectedModels, modelsLoaded} = props;
 
     const [predictionsLoading, setPredictionsLoading] = React.useState(false);
 
@@ -137,6 +137,7 @@ function EditToolbar(props) {
 
     const handleRun = () => {
         setPredictionsLoading(true);
+
         axios({
             url: '/api/classify',
             method: 'post',
@@ -171,7 +172,11 @@ function EditToolbar(props) {
                 />
             </Button>
             <Divider/>
-            <Button color="primary" startIcon={predictionsLoading ? <CircularProgress size={20}/> : <StartIcon/>} onClick={handleRun} disabled={predictionsLoading}>
+            <Button color="primary"
+                    startIcon={predictionsLoading ? <CircularProgress size={20}/> : <StartIcon/>}
+                    onClick={handleRun}
+                    disabled={predictionsLoading || !modelsLoaded}
+            >
                 Predict classes
             </Button>
             <Button color="primary" startIcon={<FileDownloadIcon/>} onClick={handleDownload} disabled={rows.filter((d) => d.direct_parents?.length > 0).length === 0}>
@@ -185,19 +190,17 @@ export default function ClassificationGrid() {
     const [rows, setRows] = React.useState([]);
     const [rowModesModel, setRowModesModel] = React.useState({});
     const [detail, setDetail] = React.useState(null);
-    const [hierarchy, setHierarchy] = React.useState({});
 
     const [ontology, setOntology] = React.useState(null);
 
     const [availableModels, setAvailableModels] = React.useState([]);
 	const [availableModelsInfoTexts, setAvailableModelsInfoTexts] = React.useState([]);
     const [selectedModels, setSelectedModels] = React.useState({});
+    const [modelsLoaded, setModelsLoaded] = React.useState(false);
 
 
-
-    if (Object.keys(hierarchy).length === 0) {
-        axios.get('/api/hierarchy').then(response => {
-            setHierarchy(response.data.hierarchy);
+    if (availableModels.length === 0) {
+        axios.get('/api/modelinfo').then(response => {
             setAvailableModels(response.data.available_models);
             setAvailableModelsInfoTexts(response.data.available_models_info_texts);
            	var newSelectedModels = {};
@@ -205,7 +208,7 @@ export default function ClassificationGrid() {
            		newSelectedModels[response.data.available_models[i]] = true;
            	}
 			setSelectedModels(newSelectedModels);
-
+            setModelsLoaded(true);
 
         });
     }
@@ -231,6 +234,8 @@ export default function ClassificationGrid() {
         if (data == null){
           return  <Alert severity="error">Could not process input!</Alert>
         } else {
+            // todo the violation handling is too much logic for the front end - this should be done in the backend
+            // (or be removed entirely as our ensemble - by design - resolves violations before outputting them)
             return (
             	<Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
                 {data.map((x) => {
@@ -238,27 +243,31 @@ export default function ClassificationGrid() {
                 	var tooltipText = "";
                 	for (var i = 0; i < violations.length; i++) {
                 		const this_violation = violations[i][0];
+                        // each violation has the structure {violated_cls_id: (violated_cls_label, [(child1_id, child1_label), (child2_id, child2_label), ...])}
                 		var children_str = [];
-						for (const [violated_cls, children] of Object.entries(this_violation)) {
-							children_str.push(`${children.map(v => hierarchy[v].label).join(', ')} ${(children.length !== 1) ? "are subclasses" : "is a subclass"} of ${hierarchy[violated_cls].label}`);
+						for (const [violated_cls, violated_cls_label_and_children] of Object.entries(this_violation)) {
+                            const violated_cls_label = violated_cls_label_and_children[0];
+                            const children = violated_cls_label_and_children[1];
+							children_str.push(`${children.map(child => child[1]).join(', ')} ${(children.length !== 1) ? "are subclasses" : "is a subclass"} of ${violated_cls_label}`);
 						}
-                		for (const [violated_cls, children] of Object.entries(this_violation)) {
-                			if (children.includes(x)) {
+                        const violated_cls_labels = Object.values(this_violation).map(v => v[0]);
+                        tooltipText = `This prediction is inconsistent: ${violated_cls_labels.join(' and ')} are marked as disjoint in ChEBI. ${children_str.join(', ')}`;
+                		for (const [violated_cls, violated_cls_label_and_children] of Object.entries(this_violation)) {
+                            const children_ids = violated_cls_label_and_children[1].map(child => child[0]);
+                			if (children_ids.includes(x[0])) {
                 				isViolation = true;
-
-								tooltipText = `This prediction is inconsistent: ${Object.keys(this_violation).map(v => hierarchy[v].label).join(' and ')} are marked as disjoint in ChEBI. ${children_str.join(', ')}`;
-								break;
+                                break;
                 			}
                 		}
 
 					}
                 	if (isViolation) {
 						return (
-							<Tooltip key={x} title={tooltipText} placement="top" arrow>
+							<Tooltip key={x[0]} title={tooltipText} placement="top" arrow>
 								<Chip
 									component="a"
-									href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")}
-									label={hierarchy[x].label}
+									href={"http://purl.obolibrary.org/obo/" + x[0].replace(":", "_")}
+									label={x[1]}
 									clickable
 									target="_blank"
 									sx={{ backgroundColor: isViolation ? 'red' : 'default' }}
@@ -267,7 +276,7 @@ export default function ClassificationGrid() {
 						);
                 	} else {
                 		return (
-                			<Chip component="a" href={"http://purl.obolibrary.org/obo/" + x.replace(":", "_")} label={hierarchy[x].label} clickable target="_blank"/>
+                			<Chip component="a" href={"http://purl.obolibrary.org/obo/" + x[0].replace(":", "_")} label={x[1]} clickable target="_blank"/>
                 		);
                 	}
                 })}
@@ -361,10 +370,6 @@ export default function ClassificationGrid() {
         },
     ];
 
-    const getLabel = (x) => {
-        return hierarchy[x]["label"]
-    }
-
     return (
       <div className="App">
         <header className="App-header">
@@ -403,7 +408,7 @@ export default function ClassificationGrid() {
                             Toolbar: EditToolbar,
                         }}
                         componentsProps={{
-                            toolbar: {setRows, setRowModesModel, rows, getLabel, setOntology, selectedModels},
+                            toolbar: {setRows, setRowModesModel, rows, setOntology, selectedModels, modelsLoaded},
                         }}
                         experimentalFeatures={{newEditingApi: true}}
                     />

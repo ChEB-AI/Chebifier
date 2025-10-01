@@ -51,6 +51,8 @@ def nx_to_graph(g: nx.Graph, colors=None):
 
 
 class HierarchyAPI(Resource):
+    # this is not used atm (the hierarchy is a large object, if some labels or subclass relations are needed,
+    # calculate in the backend and send only the relevant part)
     def get(self):
         return {
             "available_models": [model.model_name for model in ENSEMBLE.models],
@@ -137,18 +139,19 @@ class BatchPrediction(Resource):
         predicted_graph = CHEBI_FRAGMENT.subgraph([p for sample in all_predicted if sample is not None for p in sample])
         graphs_per_smiles = [CHEBI_FRAGMENT.subgraph(predicted) if predicted else None for predicted in all_predicted]
 
-        direct_parents = [[cls for cls in graph.nodes if not any(predecessor in graph.nodes
+        direct_parents = [[(cls, graph.nodes[cls]['lbl']) for cls in graph.nodes if not any(predecessor in graph.nodes
                                                                  for predecessor in graph.predecessors(cls))] if graph is not None else None
                           for graph in graphs_per_smiles]
 
         # array with dimensions [n_samples, n_violations, 2]
         violations = verify_disjointness([p for p in all_predicted if p is not None])
         # replace the violation-causing classes with the direct predictions that are influenced by them
-        violations_direct = [[[{v: [direct_pred for direct_pred in direct_preds
-                                    if direct_pred == v or nx.has_path(graph_smiles, direct_pred, v)]
+        violations_direct = [[[{v: (graph_smiles.nodes[v]['lbl'], [(direct_pred, graph_smiles.nodes[direct_pred]['lbl']) for direct_pred in direct_preds
+                                    if direct_pred == v or nx.has_path(graph_smiles, direct_pred, v)])
                                 for v in violation}] for violation in violations_sample]
                              for violations_sample, direct_preds, graph_smiles in
                              zip(violations, direct_parents, graphs_per_smiles)]
+        print(f"direct parents[0]: {direct_parents[0]}")
         result = {
             "predicted_parents": all_predicted,
             "direct_parents": direct_parents,
