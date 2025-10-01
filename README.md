@@ -2,6 +2,9 @@
 
 Chebifier is a tool for automated classification of chemicals in the [ChEBI](https://www.ebi.ac.uk/chebi/) ontology.
 
+## News
+- 25/10/01: Fixed issue where server crashed if when running predict without adding a SMILES string.
+
 ## Installation
 
 ### Setup Backend
