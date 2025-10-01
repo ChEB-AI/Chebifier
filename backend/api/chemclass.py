@@ -151,7 +151,6 @@ class BatchPrediction(Resource):
                                 for v in violation}] for violation in violations_sample]
                              for violations_sample, direct_preds, graph_smiles in
                              zip(violations, direct_parents, graphs_per_smiles)]
-        print(f"direct parents[0]: {direct_parents[0]}")
         result = {
             "predicted_parents": all_predicted,
             "direct_parents": direct_parents,
