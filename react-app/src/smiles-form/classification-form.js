@@ -1,232 +1,67 @@
 import * as React from 'react';
-import { useEffect } from 'react';
-import {Text} from 'react-native';
 import axios from "axios";
 import Alert from '@mui/material/Alert';
-import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import Switch from '@mui/material/Switch';
-import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import CloseIcon from '@mui/icons-material/Close';
+import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
-import DeleteIcon from '@mui/icons-material/DeleteOutlined';
-import FileUploadIcon from '@mui/icons-material/FileUpload';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
-import SaveIcon from '@mui/icons-material/Save';
-import CancelIcon from '@mui/icons-material/Close';
 import StartIcon from '@mui/icons-material/Start';
 import Modal from '@mui/material/Modal';
 import FormLabel from '@mui/material/FormLabel';
 import FormControl from '@mui/material/FormControl';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormHelperText from '@mui/material/FormHelperText';
 import Tooltip from '@mui/material/Tooltip';
-import Link from '@mui/material/Link';
-
-import {
-    GridRowModes,
-    DataGrid,
-    GridToolbarContainer,
-    GridActionsCellItem,
-} from '@mui/x-data-grid';
-import {
-    randomId,
-} from '@mui/x-data-grid-generator';
+import { randomId } from '@mui/x-data-grid-generator';
 
 import DetailsPage from "./details-page";
 import {plot_ontology} from "./ontology-utils";
 import {CircularProgress} from "@mui/material";
-
-const RenderDate = (props) => {
-  const { hasFocus, value } = props;
-  const buttonElement = React.useRef(null);
-  const rippleRef = React.useRef(null);
-
-  React.useLayoutEffect(() => {
-    if (hasFocus) {
-      const input = buttonElement.current?.querySelector('input');
-      input?.focus();
-    } else if (rippleRef.current) {
-      // Only available in @mui/material v5.4.1 or later
-      rippleRef.current.stop({});
-    }
-  }, [hasFocus]);
-
-  return (
-    <strong>
-      {value?.getFullYear() ?? ''}
-      <Button
-        component="button"
-        ref={buttonElement}
-        touchRippleRef={rippleRef}
-        variant="contained"
-        size="small"
-        style={{ marginLeft: 16 }}
-        // Remove button from tab sequence when cell does not have focus
-        tabIndex={hasFocus ? 0 : -1}
-        onKeyDown={(event) => {
-          if (event.key === ' ') {
-            // Prevent key navigation when focus is on button
-            event.stopPropagation();
-          }
-        }}
-      >
-        Open
-      </Button>
-    </strong>
-  );
-};
-
-const Checkbox = ({label, value, onChange, checked=true}) => {
-	return (
-		<label key={value}>
-			<input type="checkbox" name={label} checked={checked} onChange={onChange} />
-			{label}
-		</label>
-	);
-};
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 
 
-
-function EditToolbar(props) {
-    const {setRows, setRowModesModel, rows, setOntology, selectedModels, modelsLoaded} = props;
-
-    const [predictionsLoading, setPredictionsLoading] = React.useState(false);
-
-    const addRows = ((smiles) => {
-            const ids = smiles.map((s) => randomId());
-            setRows((oldRows) => [...oldRows, ...smiles.map((s, i) => ({id: ids[i], smiles: s, direct_parents: [], predicted_parents: []}))]);
-            return ids
-        }
-    )
-
-    const handleAdd = () => {
-        const ids = addRows([''])
-        setRowModesModel((oldModel) => ({
-            ...oldModel,
-            ...Object.fromEntries(ids.map(id => [id, {mode: GridRowModes.Edit, fieldToFocus: 'smiles'}])),
-        }));
-    };
-
-    const handleUpload = (event) => {
-        event.preventDefault();
-        const reader = new FileReader()
-        reader.onload = async (e) => {
-            addRows(e.target.result.trim().replace(/\r/g, "").split("\n"))
-        };
-        reader.readAsText(event.target.files[0])
-    };
-
-    const handleDownload = (event) => {
-        event.preventDefault();
-        const fileData = JSON.stringify(rows.map((r) => ({"smiles": r["smiles"], "direct_parents": r["direct_parents"],"predicted_parents": r["predicted_parents"],})).filter((d) => d.direct_parents?.length >= 0));
-        const blob = new Blob([fileData], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.download = "chebifier-predictions.json";
-        link.href = url;
-        link.click();
-    };
-
-    const handleRun = () => {
-        setPredictionsLoading(true);
-
-        axios({
-            url: '/api/classify',
-            method: 'post',
-            data: {
-            	smiles: rows.map((r) => (r["smiles"])),
-            	ontology: true,
-            	selectedModels: selectedModels
-            }
-        }).then(response => {
-            setRows((oldRows) => oldRows.map((row, i) => ({
-                ...row, "direct_parents": response.data.direct_parents[i], "predicted_parents": response.data.predicted_parents[i], "violations": response.data.violations[i]
-            })));
-            setOntology(response.data.ontology)
-        }).finally(() => {
-            setPredictionsLoading(false);
-        });
-    };
-
-    return (
-        <GridToolbarContainer>
-            <Button color="primary" startIcon={<AddIcon/>} onClick={handleAdd}>
-                Add SMILES
-            </Button>
-            <Button color="primary" startIcon={<FileUploadIcon/>} component="label">
-                Upload file
-                <input
-                    accept="text/plain"
-                    style={{display: 'none'}}
-                    id="file-upload"
-                    type="file"
-                    onChange={handleUpload}
-                />
-            </Button>
-            <Divider/>
-            <Button color="primary"
-                    startIcon={predictionsLoading ? <CircularProgress size={20}/> : <StartIcon/>}
-                    onClick={handleRun}
-                    disabled={predictionsLoading || !modelsLoaded}
-            >
-                Predict classes
-            </Button>
-            <Button color="primary" startIcon={<FileDownloadIcon/>} onClick={handleDownload} disabled={rows.filter((d) => d.direct_parents?.length > 0).length === 0}>
-                Download JSON
-            </Button>
-        </GridToolbarContainer>
-    );
-}
 
 export default function ClassificationGrid() {
     const [rows, setRows] = React.useState([]);
-    const [rowModesModel, setRowModesModel] = React.useState({});
     const [detail, setDetail] = React.useState(null);
 
     const [ontology, setOntology] = React.useState(null);
 
     const [availableModels, setAvailableModels] = React.useState([]);
 	const [availableModelsInfoTexts, setAvailableModelsInfoTexts] = React.useState([]);
-    const [selectedModels, setSelectedModels] = React.useState({});
+    const [selectedModel, setSelectedModel] = React.useState('Ensemble');
     const [modelsLoaded, setModelsLoaded] = React.useState(false);
+
+    const [inputText, setInputText] = React.useState("");
+    const [predictionsLoading, setPredictionsLoading] = React.useState(false);
+
+    const buildSelectedModels = () => {
+        // Backend expects an object map of modelName -> boolean
+        if (selectedModel === 'Ensemble') {
+            const allTrue = {};
+            availableModels.forEach(m => { allTrue[m] = true; });
+            return allTrue;
+        } else {
+            const map = {};
+            availableModels.forEach(m => { map[m] = (m === selectedModel); });
+            return map;
+        }
+    };
+
+    const selectedModels = buildSelectedModels();
 
 
     if (availableModels.length === 0) {
         axios.get('/api/modelinfo').then(response => {
             setAvailableModels(response.data.available_models);
             setAvailableModelsInfoTexts(response.data.available_models_info_texts);
-           	var newSelectedModels = {};
-           	for (var i = 0; i < response.data.available_models.length; i++) {
-           		newSelectedModels[response.data.available_models[i]] = true;
-           	}
-			setSelectedModels(newSelectedModels);
             setModelsLoaded(true);
 
         });
     }
-
-    const handleDeleteClick = (id) => () => {
-        setRows(rows.filter((row) => row.id !== id));
-    };
-
-    const processRowUpdate = (newRow) => {
-        const oldRow = rows.find(row => (row.id === newRow.id))
-        if (oldRow.smiles != newRow.smiles) {
-            newRow.predicted_parents = [];
-            newRow.direct_parents = [];
-            newRow.isNew = false;
-        }
-        setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
-        return newRow;
-    };
 
     const renderClasses = (params) => {
         const data = params.value;
@@ -290,7 +125,7 @@ export default function ClassificationGrid() {
     const handleOpen = (id) => () => {
         const thisRow = rows.find((row) => row.id === id);
         setDetailsLoading(thisRow.id);
-        axios.post('/api/details', {smiles: thisRow.smiles, selectedModels: selectedModels}).then(response => {
+        axios.post('/api/details', {smiles: thisRow.smiles, selectedModels: buildSelectedModels()}).then(response => {
             setDetail({
                 plain_molecule: response.data.figures.plain_molecule,
                 models_info: response.data.models,
@@ -304,71 +139,6 @@ export default function ClassificationGrid() {
 
     }
     const handleClose = () => setOpen(false);
-
-    const handleCheckboxChange= (event) => {
-    	const checkedModel = event.target.name;
-    	setSelectedModels({...selectedModels, [checkedModel]: event.target.checked});
-	};
-
-	const modelList = availableModels.map((model,index) => (
-		<>
-			<Tooltip title={availableModelsInfoTexts[index]} placement="bottom-start" arrow>
-			<FormControlLabel
-				control={<Switch checked={selectedModels[model]} onChange={handleCheckboxChange} name={model} />}
-				label={model}
-			/>
-			</Tooltip>
-		</>
-
-    ));
-
-
-
-
-    const columns = [
-        {
-            field: 'smiles',
-            headerName: 'SMILES',
-            flex: 0.45,
-            editable: true,
-            preProcessEditCellProps: (params) => {
-                if (params.hasChanged) {
-                    const newRow = {...params.row, "predicted_parents": [], "direct_parents": [], "isNew": false, "smiles": params.props.value}
-                    setRows(rows.map((row) => (row.id === newRow.id ? newRow : row)));
-                }
-                return { ...params.props,};
-            },
-        },
-        {field: 'direct_parents', headerName: 'Predicted Class', flex: 0.45, editable: false, renderCell:renderClasses},
-        {
-            field: 'actions',
-            type: 'actions',
-            headerName: 'Actions',
-            flex: 0.1,
-            cellClassName: 'actions',
-            getActions: ({id}) => {
-                const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
-                const thisRow = rows.find((row) => row.id === id);
-                const wasPredicted = thisRow.direct_parents?.length > 0;
-
-                return [
-                	<GridActionsCellItem
-                        icon={detailsLoading === id ? <CircularProgress size={20}/> : <LightbulbIcon/>}
-                        label="Details"
-                        onClick={handleOpen(id)}
-                        color="inherit"
-                        disabled={!wasPredicted || detailsLoading !== false}
-                    />,
-                    <GridActionsCellItem
-                        icon={<DeleteIcon/>}
-                        label="Delete"
-                        onClick={handleDeleteClick(id)}
-                        color="inherit"
-                    />,
-                ];
-            },
-        },
-    ];
 
     return (
       <div className="App">
@@ -396,22 +166,112 @@ export default function ClassificationGrid() {
                         },
                     }}
                 >
-                    <DataGrid
-                        rows={rows}
-                        columns={columns}
-                        editMode="row"
-                        rowModesModel={rowModesModel}
-                        onRowModesModelChange={(newModel) => setRowModesModel(newModel)}
-                        processRowUpdate={processRowUpdate}
-                        getRowHeight={() => 'auto'}
-                        components={{
-                            Toolbar: EditToolbar,
-                        }}
-                        componentsProps={{
-                            toolbar: {setRows, setRowModesModel, rows, setOntology, selectedModels, modelsLoaded},
-                        }}
-                        experimentalFeatures={{newEditingApi: true}}
-                    />
+                    <Box sx={{ p: 2 }}>
+                        <TextField
+                          label="Enter SMILES (one per line)"
+                          placeholder="C1=CC=CC=C1\nCC(=O)O"
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              if (!modelsLoaded || predictionsLoading) return;
+                              const smiles = inputText.trim().replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean);
+                              if (smiles.length === 0) return;
+                              // initialize rows and run classification
+                              const ids = smiles.map(() => randomId());
+                              setRows(smiles.map((s, i) => ({ id: ids[i], smiles: s, direct_parents: [], predicted_parents: [] })));
+                              setPredictionsLoading(true);
+                              axios({
+                                url: '/api/classify',
+                                method: 'post',
+                                data: {
+                                  smiles: smiles,
+                                  ontology: true,
+                                  selectedModels: selectedModels
+                                }
+                              }).then(response => {
+                                setRows((old) => old.map((row, i) => ({
+                                  ...row,
+                                  direct_parents: response.data.direct_parents[i],
+                                  predicted_parents: response.data.predicted_parents[i],
+                                  violations: response.data.violations[i]
+                                })));
+                                setOntology(response.data.ontology);
+                              }).finally(() => setPredictionsLoading(false));
+                            }
+                          }}
+                          fullWidth
+                          multiline
+                          minRows={3}
+                        />
+                        <Box sx={{ mt: 2, display: 'flex', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
+                          <FormControl sx={{ minWidth: 240 }}>
+                            <Select
+                              value={selectedModel}
+                              onChange={(e) => setSelectedModel(e.target.value)}
+                              disabled={!modelsLoaded}
+                            >
+                              <MenuItem value={'Ensemble'}>Ensemble</MenuItem>
+                              {availableModels.map((m, idx) => (
+                                <MenuItem key={m} value={m}>{m}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <Button
+                            variant="contained"
+                            onClick={() => {
+                              const smiles = inputText.trim().replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean);
+                              if (smiles.length === 0) return;
+                              const ids = smiles.map(() => randomId());
+                              setRows(smiles.map((s, i) => ({ id: ids[i], smiles: s, direct_parents: [], predicted_parents: [] })));
+                              setPredictionsLoading(true);
+                              axios({
+                                url: '/api/classify',
+                                method: 'post',
+                                data: {
+                                  smiles: smiles,
+                                  ontology: true,
+                                  selectedModels: selectedModels
+                                }
+                              }).then(response => {
+                                setRows((old) => old.map((row, i) => ({
+                                  ...row,
+                                  direct_parents: response.data.direct_parents[i],
+                                  predicted_parents: response.data.predicted_parents[i],
+                                  violations: response.data.violations[i]
+                                })));
+                                setOntology(response.data.ontology);
+                              }).finally(() => setPredictionsLoading(false));
+                            }}
+                            disabled={predictionsLoading || !modelsLoaded}
+                            startIcon={predictionsLoading ? <CircularProgress size={20}/> : <StartIcon/>}
+                          >
+                            Predict
+                          </Button>
+                        </Box>
+                        <Divider sx={{ my: 2 }} />
+                        <Box>
+                          {rows.length > 0 && rows.map((row) => (
+                            <Paper key={row.id} sx={{ p: 2, mb: 1 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="subtitle2">{row.smiles}</Typography>
+                                <Button
+                                  size="small"
+                                  onClick={handleOpen(row.id)}
+                                  disabled={!(row.direct_parents && row.direct_parents.length > 0) || predictionsLoading}
+                                  startIcon={detailsLoading === row.id ? <CircularProgress size={16}/> : <LightbulbIcon/>}
+                                >
+                                  Details
+                                </Button>
+                              </Box>
+                              <Box sx={{ mt: 1 }}>
+                                {renderClasses({ value: row.direct_parents, row })}
+                              </Box>
+                            </Paper>
+                          ))}
+                        </Box>
+                    </Box>
 
                 </Box>
             </Paper>
@@ -419,14 +279,7 @@ export default function ClassificationGrid() {
             <Paper>
                 {plot_ontology(ontology,true,false)}
             </Paper>
-			<Paper>
-				<FormControl component="fieldset" variant="standard">
-					<FormLabel component="legend">Select models:</FormLabel>
-					<FormGroup>
-						{modelList}
-					</FormGroup>
-				</FormControl>
-			</Paper>
+
 
 
 
