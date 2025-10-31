@@ -15,6 +15,7 @@ import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
 import Typography from '@mui/material/Typography';
+import { loadRDKit } from '../lib/rdkit-loader';
 
 
 function buildNode(id, node, node_color=false, includeLabel=true){
@@ -182,4 +183,43 @@ export function plot_ontology(graph) {
     } else {
         return ;
     }
+}
+
+export function MoleculeStructure(data) {
+  const [svg, setSvg] = React.useState(null);
+  const [error, setError] = React.useState(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    let mol = null;
+
+    async function run() {
+      try {
+        const RDKit = await loadRDKit();
+        if (!mounted) return;
+        mol = RDKit.get_mol(data.smiles);
+        if (!mol || mol.is_valid?.() === false) {
+          throw new Error('Invalid molecule');
+        }
+        const svgStr = mol.get_svg();
+        if (mounted) setSvg(svgStr);
+      } catch (e) {
+        if (mounted) setError(String(e));
+      } finally {
+        if (mol) mol.delete?.();
+      }
+    }
+
+    if (data.smiles) run();
+    return () => { mounted = false; };
+  }, [data.smiles]);
+
+  if (error) return <div style={{color: 'crimson'}}>RDKit error: {error}</div>;
+  if (!svg) return <div>Loading molecule…</div>;
+
+  return (
+    <div
+      dangerouslySetInnerHTML={{ __html: svg.replace('<svg', `<svg width="${data.width}" height="${data.height}"`) }}
+    />
+  );
 }
