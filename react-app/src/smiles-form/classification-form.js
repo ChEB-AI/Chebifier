@@ -375,7 +375,7 @@ export default function ClassificationGrid() {
                   <Box sx={{p: 2, width: 'auto', minWidth: '700px', display: 'inline-flex', flexDirection: 'column'}}>
                     <TextField
                       label="Enter SMILES (one per line)"
-                      placeholder="C1=CC=CC=C1\nCC(=O)O"
+                      placeholder="Cn1c(=O)c2c(ncn2C)n(C)c1=O"
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyDown={(e) => {
