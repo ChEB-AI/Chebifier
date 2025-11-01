@@ -10,7 +10,9 @@ import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import StartIcon from '@mui/icons-material/Start';
-import { SlChemistry } from "react-icons/sl";
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DownloadIcon from '@mui/icons-material/Download';
+import {SlChemistry} from "react-icons/sl";
 // import Modal from '@mui/material/Modal';
 import FormLabel from '@mui/material/FormLabel';
 import FormControl from '@mui/material/FormControl';
@@ -43,6 +45,10 @@ export default function ClassificationGrid() {
   const [predictionsLoading, setPredictionsLoading] = React.useState(false);
   const [hasPredicted, setHasPredicted] = React.useState(false);
   const [expandedRowId, setExpandedRowId] = React.useState(null);
+  // Track which model option was active when predictions were triggered
+  const [lastPredictedModel, setLastPredictedModel] = React.useState('Ensemble');
+  // If user uploads before models are loaded, queue SMILES and auto-run when ready
+  const [queuedSmiles, setQueuedSmiles] = React.useState(null);
   // map of `${rowId}-${classIdx}` -> boolean for per-chip "Why this class?" panel
   const [openWhyMap, setOpenWhyMap] = React.useState({});
   const toggleWhy = (rowId, classIdx) => () => {
@@ -50,6 +56,9 @@ export default function ClassificationGrid() {
     setOpenWhyMap(prev => ({...prev, [key]: !prev[key]}));
   };
   const isWhyOpen = (rowId, classIdx) => !!openWhyMap[`${rowId}-${classIdx}`];
+
+  // Ref to hidden file input for uploading SMILES
+  const fileInputRef = React.useRef(null);
 
   const buildSelectedModels = () => {
     // Backend expects an object map of modelName -> boolean
@@ -79,6 +88,34 @@ export default function ClassificationGrid() {
 
     });
   }
+
+  // If user uploaded SMILES before models were ready, auto-run once models are loaded
+  React.useEffect(() => {
+    if (modelsLoaded && queuedSmiles && !predictionsLoading) {
+      setLastPredictedModel(selectedModel);
+      setHasPredicted(true);
+      setPredictionsLoading(true);
+      axios({
+        url: '/api/classify',
+        method: 'post',
+        data: {
+          smiles: queuedSmiles,
+          ontology: true,
+          selectedModels: selectedModels
+        }
+      }).then(response => {
+        setRows((old) => old.map((row, i) => ({
+          ...row,
+          direct_parents: response.data.direct_parents[i],
+          predicted_parents: response.data.predicted_parents[i],
+          ontology: response.data.ontology[0][i],
+        })));
+      }).finally(() => {
+        setPredictionsLoading(false);
+        setQueuedSmiles(null);
+      });
+    }
+  }, [modelsLoaded, queuedSmiles, predictionsLoading, selectedModels]);
 
   const renderClasses = (params) => {
     const data = params.value;
@@ -121,13 +158,15 @@ export default function ClassificationGrid() {
                   clickable
                   target="_blank"
                 />
-                <Button size="small" onClick={toggleWhy(row.id, idx)} sx={{ml: 'auto'}}>
-                  {whyOpen ? 'Hide' : 'Why this class?'}
-                </Button>
+                {lastPredictedModel === 'Ensemble' && (
+                  <Button size="small" onClick={toggleWhy(row.id, idx)} sx={{ml: 'auto'}}>
+                    {whyOpen ? 'Hide' : 'Why this class?'}
+                  </Button>
+                )}
               </Box>
               <Collapse in={whyOpen} timeout="auto" unmountOnExit>
                 <Box sx={{px: 1, pb: 1, overflowX: 'auto'}}>
-                  <Table size="small" aria-label="why-this-class" sx={{ minWidth: 700 }}>
+                  <Table size="small" aria-label="why-this-class" sx={{minWidth: 700}}>
                     <TableHead>
                       <TableRow>
                         <TableCell>Model</TableCell>
@@ -140,7 +179,8 @@ export default function ClassificationGrid() {
                     </TableHead>
                     <TableBody>
                       {Object.entries(x[2] || {}).map(([k, v]) => (
-                        <TableRow key={`why-${row.id}-${idx}-${k}`} style={{backgroundColor: v?.model_score > 0 ? '#a8f099' : '#f0a699'}}>
+                        <TableRow key={`why-${row.id}-${idx}-${k}`}
+                                  style={{backgroundColor: v?.model_score > 0 ? '#a8f099' : '#f0a699'}}>
                           <TableCell>{k}</TableCell>
                           <TableCell>{String(v?.prediction)}</TableCell>
                           <TableCell>{typeof v?.confidence === 'number' ? v.confidence.toFixed(3) : String(v?.confidence)}</TableCell>
@@ -179,6 +219,17 @@ export default function ClassificationGrid() {
     );
   };
 
+  const addRows = ((smiles) => {
+    const ids = smiles.map(() => randomId());
+    setRows(smiles.map((s, i) => ({
+      id: ids[i],
+      smiles: s,
+      direct_parents: [],
+      predicted_parents: []
+    })));
+
+  })
+
   const [detailsLoading, setDetailsLoading] = React.useState(false);
   const handleToggleExpand = (id) => () => {
     if (expandedRowId === id) {
@@ -204,6 +255,79 @@ export default function ClassificationGrid() {
       });
     }
   }
+
+  const handleUpload = (event) => {
+    event.preventDefault();
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = String(e.target.result || '').replace(/\r/g, '').trim();
+      // Show uploaded content in the input field
+      setInputText(text);
+      // Parse SMILES from lines
+      const smiles = text.split('\n').map(s => s.trim()).filter(Boolean);
+      if (smiles.length === 0) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+      // Initialize rows
+      addRows(smiles);
+      // Auto-run prediction if models are loaded and we're not already loading
+      if (modelsLoaded && !predictionsLoading) {
+        setLastPredictedModel(selectedModel);
+        setHasPredicted(true);
+        setPredictionsLoading(true);
+        axios({
+          url: '/api/classify',
+          method: 'post',
+          data: {
+            smiles: smiles,
+            ontology: true,
+            selectedModels: selectedModels
+          }
+        }).then(response => {
+          setRows((old) => old.map((row, i) => ({
+            ...row,
+            direct_parents: response.data.direct_parents[i],
+            predicted_parents: response.data.predicted_parents[i],
+            ontology: response.data.ontology[0][i],
+          })));
+        }).finally(() => setPredictionsLoading(false));
+      } else {
+        // Queue the SMILES to auto-run once models are loaded / ready
+        setQueuedSmiles(smiles);
+      }
+      // Reset input so the same file can be uploaded again if needed
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDownload = (event) => {
+    event.preventDefault();
+    const fileData = JSON.stringify(rows.map((r) => ({
+      "smiles": r["smiles"],
+      "direct_parents": r["direct_parents"].map(element => [element[0], element[1]]),
+      "predicted_parents": r["predicted_parents"],
+    })).filter((d) => d.direct_parents?.length >= 0));
+    const blob = new Blob([fileData], {type: "text/plain"});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = "chebifier-predictions.json";
+    link.href = url;
+    link.click();
+  };
+
+  // Append helper for example SMILES buttons
+  const appendSmiles = (smiles) => {
+    setInputText((prev) => {
+      const p = String(prev || '').replace(/\r/g, '');
+      if (!p) return smiles;
+      const needsNewline = !p.endsWith('\n');
+      return p + (needsNewline ? '\n' : '') + smiles;
+    });
+  };
 
   return (
     <div className="App">
@@ -255,19 +379,14 @@ export default function ClassificationGrid() {
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        if (e.key === 'Enter' && e.ctrlKey) {
                           e.preventDefault();
                           if (!modelsLoaded || predictionsLoading) return;
                           const smiles = inputText.trim().replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean);
                           if (smiles.length === 0) return;
                           // initialize rows and run classification
-                          const ids = smiles.map(() => randomId());
-                          setRows(smiles.map((s, i) => ({
-                            id: ids[i],
-                            smiles: s,
-                            direct_parents: [],
-                            predicted_parents: []
-                          })));
+                          addRows(smiles);
+                          setLastPredictedModel(selectedModel);
                           setHasPredicted(true);
                           setPredictionsLoading(true);
                           axios({
@@ -292,8 +411,41 @@ export default function ClassificationGrid() {
                       multiline
                       minRows={3}
                     />
-                    <Box sx={{mt: 2, display: 'flex', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap', width: '100%'}}>
-                      <FormControl>
+                    {/* Example SMILES quick-add buttons */}
+                    <Box sx={{ mt: 0.5, mb: 0.5, display: 'flex', gap: 2 }}>
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => appendSmiles('CO')}
+                        sx={{
+                          p: 0,
+                          minWidth: 'auto',
+                          textTransform: 'none',
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        Try methane
+                      </Button>
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => appendSmiles('Cn1c(=O)c2c(ncn2C)n(C)c1=O')}
+                        sx={{
+                          p: 0,
+                          minWidth: 'auto',
+                          textTransform: 'none',
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        Try caffeine
+                      </Button>
+                    </Box>
+                    <Box sx={{mt: 1, display: 'flex', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap', width: '100%'}}>
+                      <FormControl size="small" sx={{
+                        minWidth: 200,
+                        '& .MuiOutlinedInput-root': { height: 36 },
+                        '& .MuiSelect-select': { py: 0.5 }
+                      }}>
                         <Select
                           value={selectedModel}
                           onChange={(e) => setSelectedModel(e.target.value)}
@@ -305,6 +457,40 @@ export default function ClassificationGrid() {
                           ))}
                         </Select>
                       </FormControl>
+                      {/* Hidden file input for SMILES upload */}
+                      <input
+                        type="file"
+                        accept="text/plain"
+                        style={{display: 'none'}}
+                        ref={fileInputRef}
+                        onChange={handleUpload}
+                      />
+                      <Tooltip title="Upload SMILES from file (one per line)">
+                        <span>
+                          <Button
+                            variant="outlined"
+                            startIcon={<UploadFileIcon/>}
+                            onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                            disabled={predictionsLoading}
+                            sx={{ml: 'auto'}}
+                          >
+                            Upload
+                          </Button>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={rows.length === 0 ? "No results to download yet" : "Download results as JSON"}>
+                        <span>
+                          <Button
+                            variant="outlined"
+                            startIcon={<DownloadIcon/>}
+                            onClick={handleDownload}
+                            disabled={rows.length === 0}
+                            sx={{ml: 'auto'}}
+                          >
+                            Download
+                          </Button>
+                        </span>
+                      </Tooltip>
                       <Button
                         variant="contained"
                         sx={{ml: 'auto'}}
@@ -318,6 +504,7 @@ export default function ClassificationGrid() {
                             direct_parents: [],
                             predicted_parents: []
                           })));
+                          setLastPredictedModel(selectedModel);
                           setHasPredicted(true);
                           setPredictionsLoading(true);
                           axios({
@@ -364,65 +551,69 @@ export default function ClassificationGrid() {
                       {rows.map((row) => {
                         const canExpand = (row.direct_parents && row.direct_parents.length > 0) && !predictionsLoading;
                         return (
-                        <Paper key={row.id} sx={{p: 2, mb: 1}}
-                               onClick={(e) => {
-                                 if (!canExpand) return;
-                                 const t = e.target;
-                                 const interactive = t.closest(
-                                   'a, button, [role="button"], input, textarea, select, .MuiButtonBase-root, .MuiLink-root, .MuiChip-root'
-                                 );
-                                 if (interactive) return;
-                                 const nestedPaper = t.closest('.MuiPaper-root');
-                                 if (nestedPaper && nestedPaper !== e.currentTarget) return;
-                                 handleToggleExpand(row.id)();
-                               }}
-                        >
-                          <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                            <Typography variant="subtitle2">{row.smiles}</Typography>
-                            <Button
-                              size="small"
-                              onClick={(e) => {e.stopPropagation(); handleToggleExpand(row.id)(); }}
-                              disabled={!canExpand}
-                              startIcon={detailsLoading === row.id && expandedRowId !== row.id ? <CircularProgress size={16}/> : <LightbulbIcon/>}
-                            >
-                              {expandedRowId === row.id ? 'Hide' : 'Details'}
-                            </Button>
-                          </Box>
-                          {expandedRowId !== row.id && (
-                            <Box sx={{mt: 1}}>
-                              {renderClasses({value: row.direct_parents, row})}
+                          <Paper key={row.id} sx={{p: 2, mb: 1}}
+                                 onClick={(e) => {
+                                   if (!canExpand) return;
+                                   const t = e.target;
+                                   const interactive = t.closest(
+                                     'a, button, [role="button"], input, textarea, select, .MuiButtonBase-root, .MuiLink-root, .MuiChip-root'
+                                   );
+                                   if (interactive) return;
+                                   const nestedPaper = t.closest('.MuiPaper-root');
+                                   if (nestedPaper && nestedPaper !== e.currentTarget) return;
+                                   handleToggleExpand(row.id)();
+                                 }}
+                          >
+                            <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                              <Typography variant="subtitle2">{row.smiles}</Typography>
+                              <Button
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleExpand(row.id)();
+                                }}
+                                disabled={!canExpand}
+                                startIcon={detailsLoading === row.id && expandedRowId !== row.id ?
+                                  <CircularProgress size={16}/> : <LightbulbIcon/>}
+                              >
+                                {expandedRowId === row.id ? 'Hide' : 'Details'}
+                              </Button>
                             </Box>
-                          )}
-                          {expandedRowId === row.id && (
-                            <Box sx={{mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2}}>
-                              <Paper sx={{p: 2, flex: '1 1 320px', minWidth: 400}}>
-                                <Typography variant="subtitle2" gutterBottom>Predicted classes</Typography>
+                            {expandedRowId !== row.id && (
+                              <Box sx={{mt: 1}}>
                                 {renderClasses({value: row.direct_parents, row})}
-                              </Paper>
-                              <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 200, overflowX: 'auto'}}>
-                                <Typography variant="subtitle2" gutterBottom>Molecular graph</Typography>
-                                <MoleculeStructure smiles={row.smiles} height={200} width={200} />
-                              </Paper>
-                              <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 820, overflowX: 'auto'}}>
-                                <Typography variant="subtitle2" gutterBottom>Ontology graph</Typography>
-                                {plot_ontology(row.ontology, true, false)}
-                              </Paper>
-                              <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 420, overflow: 'hidden'}}>
-                                <Typography variant="subtitle2" gutterBottom>Model-specific insights</Typography>
-                                {detailsByRow[row.id] ? (
-                                  <DetailsPage detail={detailsByRow[row.id]}
-                                               handleClose={() => setExpandedRowId(null)}/>
-                                ) : (
-                                  <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-                                    <CircularProgress size={20}/>
-                                    <Typography variant="body2">Loading model-specific insights…</Typography>
-                                  </Box>
-                                )}
-                              </Paper>
+                              </Box>
+                            )}
+                            {expandedRowId === row.id && (
+                              <Box sx={{mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2}}>
+                                <Paper sx={{p: 2, flex: '1 1 320px', minWidth: 400}}>
+                                  <Typography variant="subtitle2" gutterBottom>Predicted classes</Typography>
+                                  {renderClasses({value: row.direct_parents, row})}
+                                </Paper>
+                                <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 200, overflowX: 'auto'}}>
+                                  <Typography variant="subtitle2" gutterBottom>Molecular graph</Typography>
+                                  <MoleculeStructure smiles={row.smiles} height={200} width={200}/>
+                                </Paper>
+                                <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 820, overflowX: 'auto'}}>
+                                  <Typography variant="subtitle2" gutterBottom>Ontology graph</Typography>
+                                  {plot_ontology(row.ontology, true, false)}
+                                </Paper>
+                                <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 420, overflow: 'hidden'}}>
+                                  <Typography variant="subtitle2" gutterBottom>Model-specific insights</Typography>
+                                  {detailsByRow[row.id] ? (
+                                    <DetailsPage detail={detailsByRow[row.id]}
+                                                 handleClose={() => setExpandedRowId(null)}/>
+                                  ) : (
+                                    <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
+                                      <CircularProgress size={20}/>
+                                      <Typography variant="body2">Loading model-specific insights…</Typography>
+                                    </Box>
+                                  )}
+                                </Paper>
 
-                            </Box>
-                          )}
-                        </Paper>
+                              </Box>
+                            )}
+                          </Paper>
                         );
                       })}
                       <Divider sx={{my: 2}}/>
