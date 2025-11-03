@@ -586,7 +586,7 @@ export default function ClassificationGrid() {
                             )}
                             {expandedRowId === row.id && (
                               <Box sx={{mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2}}>
-                                <Paper sx={{p: 2, flex: '1 1 500px', minWidth: 400}}>
+                                <Paper sx={{p: 2, flex: '1 1 700px', minWidth: 400}}>
                                   <Typography variant="subtitle2" gutterBottom>Predicted classes</Typography>
                                   {renderClasses({value: row.direct_parents, row})}
                                 </Paper>
