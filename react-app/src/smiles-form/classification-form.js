@@ -586,19 +586,19 @@ export default function ClassificationGrid() {
                             )}
                             {expandedRowId === row.id && (
                               <Box sx={{mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2}}>
-                                <Paper sx={{p: 2, flex: '1 1 320px', minWidth: 400}}>
+                                <Paper sx={{p: 2, flex: '1 1 500px', minWidth: 400}}>
                                   <Typography variant="subtitle2" gutterBottom>Predicted classes</Typography>
                                   {renderClasses({value: row.direct_parents, row})}
                                 </Paper>
-                                <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 200, overflowX: 'auto'}}>
+                                <Paper sx={{p: 2, flex: '1 1 280px', minWidth: 250, overflowX: 'auto'}}>
                                   <Typography variant="subtitle2" gutterBottom>Molecular graph</Typography>
-                                  <MoleculeStructure smiles={row.smiles} height={200} width={200}/>
+                                  <MoleculeStructure smiles={row.smiles} height={250} width={250}/>
                                 </Paper>
-                                <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 820, overflowX: 'auto'}}>
+                                <Paper sx={{p: 2, flex: '2 1 820px', minWidth: 820, overflowX: 'auto'}}>
                                   <Typography variant="subtitle2" gutterBottom>Ontology graph</Typography>
                                   {plot_ontology(row.ontology, true, false)}
                                 </Paper>
-                                <Paper sx={{p: 2, flex: '1 1 480px', minWidth: 420, overflow: 'hidden'}}>
+                                <Paper sx={{p: 2, flex: '1 1 600px', minWidth: 500, overflow: 'hidden'}}>
                                   <Typography variant="subtitle2" gutterBottom>Model-specific insights</Typography>
                                   {detailsByRow[row.id] ? (
                                     <DetailsPage detail={detailsByRow[row.id]}
