@@ -20,13 +20,13 @@ import { loadRDKit } from '../lib/rdkit-loader';
 
 function buildNode(id, node, node_color=false, includeLabel=true){
     const d = {id:id}
-    d["title"] = node["lbl"]
+    d["title"] = node["name"]
     if(!node.artificial){
-        d["lbl"] = d["title"]
+        d["name"] = d["title"]
     } else {
         d["color"] = "#c4c4c0"
     }
-    if (node_color != false) {
+    if (node_color !== false) {
     	d["color"] = node_color;
 	}
     return d
@@ -38,11 +38,7 @@ function buildEdge(id, edge){
 
 function renderClassListElement(s, node){
     const node_id = String(s)
-    if(node_id.startsWith("CHEBI:")){
-        return (<ListItemText><Link href={node_id.replace("CHEBI:", "http://purl.obolibrary.org/obo/CHEBI_")}>{node["title"] || node_id}</Link></ListItemText>)
-    } else {
-        return <ListItemText>{node["title"] || s}</ListItemText>
-    }
+    return (<ListItemText><Link href={node_id.replace("CHEBI:", "http://purl.obolibrary.org/obo/CHEBI_")}>{node["title"] || node_id}</Link></ListItemText>)
 }
 
 function subheader(list){
@@ -61,8 +57,8 @@ function renderOverview(node, graph){
 
     }
     const nodeDict = Object.fromEntries(graph.nodes.map(x => [x["id"], x]));
-    const superclasses = graph.edges.filter((e) => (e["from"] == node)).map((e) => renderClassListElement(e["to"], nodeDict[e["to"]]))
-    const subclasses = graph.edges.filter((e) => (e["to"] == node)).map((e) => renderClassListElement(e["from"], nodeDict[e["from"]]))
+    const superclasses = graph.edges.filter((e) => (e["from"] === node)).map((e) => renderClassListElement(e["to"], nodeDict[e["to"]]))
+    const subclasses = graph.edges.filter((e) => (e["to"] === node)).map((e) => renderClassListElement(e["from"], nodeDict[e["from"]]))
 
     return (<Box>
         <List dense={true}>
@@ -70,7 +66,7 @@ function renderOverview(node, graph){
                 This class
             </ListSubheader>
             <ListItem>
-                <ListItemText>{nodeDict[node]["title"] || node}</ListItemText>
+              {renderClassListElement(node, nodeDict[node])}
             </ListItem>
             <ListSubheader>
                 <ArrowUpwardIcon/>Superclasses
@@ -100,9 +96,9 @@ export function VisNetwork(data) {
             layout={
                 hierarchical: {
                     enabled: true,
-                    direction: "LR",
+                    direction: "RL",
                     sortMethod: "directed",
-                    levelSeparation: 250,
+                    levelSeparation: 150,
                 }
             }
         } else {
