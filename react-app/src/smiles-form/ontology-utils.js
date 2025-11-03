@@ -38,7 +38,7 @@ function buildEdge(id, edge){
 
 function renderClassListElement(s, node){
     const node_id = String(s)
-    return (<ListItemText><Link href={node_id.replace("CHEBI:", "http://purl.obolibrary.org/obo/CHEBI_")}>{node["title"] || node_id}</Link></ListItemText>)
+    return (<ListItemText><Link href={"http://purl.obolibrary.org/obo/CHEBI_" + node_id}>{node["title"] || node_id}</Link></ListItemText>)
 }
 
 function subheader(list){
