@@ -1,14 +1,13 @@
 {
     "TESTING":true,
     "CHEBI_JSON": "path-to-chebi-export.json",
-    "MODELS": [
-        {
-            "class": "PythonClassName",
-            "name": "Model name",
-            "checkpoint_path": "path-to-checkpoint.ckpt",
+    "MODELS": {
+        "My model": {
+            "type": "chebifier type (e.g. electra)",
+            "ckpt_path": "path/to/checkpoint.ckpt",
             "batch_size": 32,
-            "data_class": "ChEBI100",
-            "prediction_headers_path": "path-to-classes.txt"
+            "target_labels_path": "path/to/classes.txt",
+            "classwise_weights_path": "path/to/trust.json"
         }
-    ]
+    }
 }
