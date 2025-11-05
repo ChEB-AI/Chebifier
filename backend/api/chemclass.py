@@ -12,7 +12,7 @@ import networkx as nx
 from rdkit import Chem
 from rdkit.Chem.Draw import rdMolDraw2D
 import torch
-from chebi_utils import LABEL_HIERARCHY, CHEBI_FRAGMENT, get_transitive_predictions
+from chebi_utils import CHEBI_FRAGMENT
 import hashlib
 
 from chebifier.ensemble.weighted_majority_ensemble import WMVwithF1Ensemble
@@ -40,7 +40,7 @@ def _build_node(ident, node, include_labels=True):
 def nx_to_graph(g: nx.Graph, colors=None):
     results = {
         "nodes": {n: g.nodes[n] for n in g.nodes},
-        "edges": list(g.edges)
+        "edges": [edge for edge in g.edges() if "label" in g.get_edge_data(edge[0], edge[1])],
     }
     if colors is not None:
         results["node_colors"] = dict()
@@ -48,17 +48,6 @@ def nx_to_graph(g: nx.Graph, colors=None):
             if node in results["nodes"]:
                 results["node_colors"][node] = color
     return results
-
-
-class HierarchyAPI(Resource):
-    # this is not used atm (the hierarchy is a large object, if some labels or subclass relations are needed,
-    # calculate in the backend and send only the relevant part)
-    def get(self):
-        return {
-            "available_models": [model.model_name for model in ENSEMBLE.models],
-            "available_models_info_texts": [model.info_text for model in ENSEMBLE.models],
-            "hierarchy": {r["ID"]: dict(label=r["LABEL"][0], children=r.get("SubClasses", [])) for r in LABEL_HIERARCHY}
-        }
 
 
 class ModelInfoAPI(Resource):
@@ -122,60 +111,61 @@ class BatchPrediction(Resource):
                 "violations": []
             }
             if generate_ontology:
-                # violation_colors = {violator: "#d92946" for violations_sample in violations for violation in violations_sample for violator in violation}
-                result["ontology"] = nx_to_graph(CHEBI_FRAGMENT.subgraph([]))
+                result["ontology"] = []
             return result
 
         ensemble_models = ENSEMBLE.models
         try:
             ENSEMBLE.models = [model for model in ensemble_models if
                                model.model_name in selected_models and selected_models[model.model_name]]
-            all_predicted = ENSEMBLE.predict_smiles_list(smiles, load_preds_if_possible=False)
+            all_predicted, intermediate_results = ENSEMBLE.predict_smiles_list(smiles, return_intermediate_results=True)
         finally:
             ENSEMBLE.models = ensemble_models  # restore original model list
 
-        all_predicted = [[f"CHEBI:{cls}" for cls in sample if cls is not None] if sample is not None else None for sample in all_predicted]
-
-        predicted_graph = CHEBI_FRAGMENT.subgraph([p for sample in all_predicted if sample is not None for p in sample])
         graphs_per_smiles = [CHEBI_FRAGMENT.subgraph(predicted) if predicted else None for predicted in all_predicted]
 
-        direct_parents = [[(cls, graph.nodes[cls]['lbl']) for cls in graph.nodes if not any(predecessor in graph.nodes
-                                                                 for predecessor in graph.predecessors(cls))] if graph is not None else None
-                          for graph in graphs_per_smiles]
+        direct_parents = []
+        for smiles_idx in range(len(all_predicted)):
+            graph = graphs_per_smiles[smiles_idx]
+            if graph is None:
+                direct_parents.append(None)
+                continue
+            direct_parents_for_smiles = []
+            for cls in all_predicted[smiles_idx]:
+                cls_idx = intermediate_results["predicted_classes"][cls]
+                if any(parent in graph.nodes for parent in graph.successors(cls)):
+                    continue
+                calculations = dict()
+                for model_idx, model in enumerate([model for model in ensemble_models if
+                               model.model_name in selected_models and selected_models[model.model_name]]):
+                    pos_prediction = intermediate_results["positive_mask"][smiles_idx, cls_idx, model_idx]
+                    neg_prediction = intermediate_results["negative_mask"][smiles_idx, cls_idx, model_idx]
+                    # skip models that made no prediction
+                    if pos_prediction or neg_prediction:
+                        confidence = intermediate_results["confidence"][smiles_idx, cls_idx, model_idx]
+                        trust = intermediate_results["classwise_weights"][0 if pos_prediction else 1][cls_idx, model_idx].item() / model.model_weight
+                        calculations[model.model_name] = {
+                            "prediction": pos_prediction.item(),
+                            "confidence": confidence.item(),
+                            # select either trust for positive or negative predictions
+                            "trust": trust,
+                            "model_weight": model.model_weight,
+                            "model_score": (-1 if neg_prediction else 1) * confidence.item() * trust * model.model_weight,
+                        }
+                net_score = intermediate_results["net_score"][smiles_idx, cls_idx].item()
+                direct_parents_for_smiles.append((cls, graph.nodes[cls]["name"], calculations, net_score))
+            direct_parents.append(direct_parents_for_smiles)
 
-        # array with dimensions [n_samples, n_violations, 2]
-        violations = verify_disjointness([p for p in all_predicted if p is not None])
-        # replace the violation-causing classes with the direct predictions that are influenced by them
-        violations_direct = [[[{v: (graph_smiles.nodes[v]['lbl'], [(direct_pred, graph_smiles.nodes[direct_pred]['lbl']) for direct_pred in direct_preds
-                                    if direct_pred == v or nx.has_path(graph_smiles, direct_pred, v)])
-                                for v in violation}] for violation in violations_sample]
-                             for violations_sample, direct_preds, graph_smiles in
-                             zip(violations, direct_parents, graphs_per_smiles)]
         result = {
             "predicted_parents": all_predicted,
             "direct_parents": direct_parents,
-            "violations": violations_direct
         }
         if generate_ontology:
-            # violation_colors = {violator: "#d92946" for violations_sample in violations for violation in violations_sample for violator in violation}
-            result["ontology"] = nx_to_graph(predicted_graph)
+            result["ontology"] = [nx_to_graph(g) if g is not None else None for g in graphs_per_smiles],
+
         return result
 
-
-def to_color(model_name):
-    # turn any string into a color
-    h = hashlib.md5(model_name.encode()).hexdigest()
-    return "#" + h[:6]
-
-
 class PredictionDetailApiHandler(Resource):
-
-    def load_image(self, path):
-        im = Image.open(path)
-        data = io.BytesIO()
-        im.save(data, "PNG")
-        encoded_img_data = base64.b64encode(data.getvalue())
-        return encoded_img_data.decode("utf-8")
 
     def post(self):
         parser = reqparse.RequestParser()
@@ -189,59 +179,14 @@ class PredictionDetailApiHandler(Resource):
         smiles = args["smiles"]
         selected_models = args["selectedModels"]
 
-        predicted_classes = []
-        predicted_by_model = {}
-        explain_infos = {"models": {}}
-        ensemble_models = ENSEMBLE.models
-        try:
-            ENSEMBLE.models = [model for model in ensemble_models if model.model_name in selected_models and selected_models[model.model_name]]
-            for model in ENSEMBLE.models:
-                pred = model.predict_smiles(smiles)
-                if pred is not None:
-                    pred = [f"CHEBI:{cls}" for cls in pred if pred[cls] > ENSEMBLE.positive_prediction_threshold]
-                    predicted_classes += pred
-                    predicted_by_model[model.model_name] = pred
-            for model in ENSEMBLE.models:
-                explain_infos_model = model.explain_smiles(smiles)
-                if explain_infos_model is not None:
-                    explain_infos_model["model_type"] = model.__class__.__name__
-                    explain_infos_model["model_info"] = model.info_text
-                    explain_infos["models"][model.model_name] = explain_infos_model
+        explain_infos = {"models": dict()}
+        do_models = [model for model in ENSEMBLE.models if model.model_name in selected_models and selected_models[model.model_name]]
 
-            # add ensemble predictions as own model
-            pred = ENSEMBLE.predict_smiles_list([smiles], load_preds_if_possible=False)[0]
-        finally:
-            ENSEMBLE.models = ensemble_models # restore original models
-
-        if pred is not None:
-            pred = [f"CHEBI:{cls}" for cls in pred if cls is not None]
-            predicted_classes += pred
-            predicted_by_model["Ensemble"] = pred
-
-        all_predicted = get_transitive_predictions([predicted_classes])
-        chebi = CHEBI_FRAGMENT.subgraph(all_predicted)
-
-        predicted_by_per_node = {cls: [] for cls in all_predicted}
-        for model_name, nodes in predicted_by_model.items():
-            for node in nodes:
-                predicted_by_per_node[node].append(model_name)
-        node_colors = {node: to_color(str(predicted_by_per_node[node])) for node in all_predicted
-                       }
-        color_legend = {
-            to_color(str(preds)): " and ".join(preds) if len(preds) > 0 else "Inferred based on predicted subclasses"
-            for preds in predicted_by_per_node.values()}
-
-        # todo replace with smiles (and paint with rdkit-js)
-        with open("image.png", mode="wt") as svg1:
-            rdmol = Chem.MolFromSmiles(smiles)
-            d = rdMolDraw2D.MolDraw2DCairo(500, 500)
-            rdMolDraw2D.PrepareAndDrawMolecule(d, rdmol)
-            d.FinishDrawing()
-            d.WriteDrawingText(svg1.name)
-            mol_pic = self.load_image(svg1.name)
-
-        explain_infos["figures"] = {"plain_molecule": mol_pic}
-        explain_infos["classification"] = nx_to_graph(chebi, node_colors)
-        explain_infos["color_legend"] = color_legend
+        for model in do_models:
+            explain_infos_model = model.explain_smiles(smiles)
+            if explain_infos_model is not None:
+                explain_infos_model["model_type"] = model.__class__.__name__
+                explain_infos_model["model_info"] = model.info_text
+                explain_infos["models"][model.model_name] = explain_infos_model
 
         return explain_infos

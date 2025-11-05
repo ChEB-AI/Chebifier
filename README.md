@@ -1,10 +1,11 @@
 # Chebifier
 
-Chebifier is a tool for automated classification of chemicals in the [ChEBI](https://www.ebi.ac.uk/chebi/) ontology.
+Chebifier is a tool for automated classification of chemicals in the [ChEBI](https://www.ebi.ac.uk/chebi/) ontology. This repository only hosts the front end of Chebifier. For the classification itself, see [python-chebifier](github.com/ChEBI-AI/python-chebifier).
 
 ## News
-- 25/10/01: Fixed issue where server crashed if running predict without adding a SMILES string.
-- 25/10/01: Improved loading times significantly by only passing ChEBI-related information when needed.
+- 2025/11/05: Added new models (v244, including GAT, 3-STAR models and augmented GNNs), redesigned frontend.
+- 2025/10/01: Fixed issue where server crashed if running predict without adding a SMILES string.
+- 2025/10/01: Improved loading times significantly by only passing ChEBI-related information when needed.
 
 ## Installation
 
@@ -24,10 +25,11 @@ After that, you can install the prediction system and web framework:
 
 and change the path for each setting according to your setup.
 
- * ELECTRA_CHECKPOINT : Path to a chebai-electra checkpoint,
- * BATCH_SIZE: Number of molecules that are passed to the model at once,
- * CLASS_HEADERS: Mapping of prediction labels to ChEBI classes,
- * CHEBI_JSON: Hierarchy of labels defined in `CLASS_HEADERS` (this file can be generate with [robot export](http://robot.obolibrary.org/export) using the options `--header "ID|LABEL|SubClasses" --entity-format ID`)
+The ensemble can take any models that are implemented in [python-chebifier](github.com/ChEBI-AI/python-chebifier). See the repository for example configurations. Common arguments for a model are:
+ * `type`: one of the available [MODEL_TYPES](https://github.com/ChEB-AI/python-chebifier/blob/dev/chebifier/model_registry.py), e.g. `electra`,
+ * `batch_size`: Number of molecules that are passed to the model at once,
+ * `target_labels_path`: List of ChEBI classes (the `classes.txt` file that comes as part of a [ChEB-AI](github.com/ChEB-AI/python-chebai) dataset)
+ * `classwise_weights_path` (optional): Weights that should be assigned to each class (i.e., trust scores calculated on a validation set with [this script](https://github.com/ChEB-AI/python-chebai/blob/dev/chebai/result/generate_class_properties.py)
 
 
 
@@ -49,8 +51,6 @@ flask run
 ```
 
 The server should now run at [localhost:5000](localhost:5000)
-
-## What's New?
 
 ## Citation
 

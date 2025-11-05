@@ -1,24 +1,19 @@
 import logo from './logo.svg';
 import './App.css';
 import Navbar from './navbar.js';
-import ClassificationGrid from './smiles-form/classification-form.js'
 import '../node_modules/vis-network/styles/vis-network.css';
-import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import About from "./About";
+import Pages from './Pages';
 
 function App() {
   return (
-  	<BrowserRouter>
+    <BrowserRouter>
+      <Navbar />
       <Routes>
-        <Route path="/" element={<Navbar />}>
-          <Route index element={<ClassificationGrid />} />
-          <Route path="about" element={<About />} />
+        <Route path="*" element={<Pages />}>
         </Route>
       </Routes>
     </BrowserRouter>
-
   );
 }
 

@@ -152,7 +152,7 @@ export function HighlightsBlocks(data) {
 		} else if (block_type === "heading") {
 			blocks_content.push(
 				<Box>
-					<h3>{block_content}</h3>
+					<h5>{block_content}</h5>
 				</Box>
 			);
 		} else {
