@@ -166,6 +166,12 @@ export default function ClassificationGrid() {
               </Box>
               <Collapse in={whyOpen} timeout="auto" unmountOnExit>
                 <Box sx={{px: 1, pb: 1, overflowX: 'auto'}}>
+                  <Typography variant="body2">
+                    The ensemble decides by a weighted voting of models.
+                    Each models receives a score (the product of confidence, trust and model weight).
+                    Scores of models that make positive predictions are added, scores of models that make negative predictions are substracted.
+                    If the sum is positive, the ensemble predicts this class.
+                  </Typography>
                   <Table size="small" aria-label="why-this-class" sx={{minWidth: 700}}>
                     <TableHead>
                       <TableRow>
