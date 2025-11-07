@@ -16,6 +16,7 @@ import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
 import Typography from '@mui/material/Typography';
 import { loadRDKit } from '../lib/rdkit-loader';
+import Alert from "@mui/material/Alert";
 
 
 function buildNode(id, node, node_color=false, includeLabel=true){
@@ -210,7 +211,7 @@ export function MoleculeStructure(data) {
     return () => { mounted = false; };
   }, [data.smiles]);
 
-  if (error) return <div style={{color: 'crimson'}}>RDKit error: {error}</div>;
+  if (error) return <Alert severity="error">RDKit failed to process input!</Alert>
   if (!svg) return <div>Loading molecule…</div>;
 
   return (

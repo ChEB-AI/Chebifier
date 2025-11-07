@@ -26,6 +26,7 @@ import Typography from '@mui/material/Typography';
 import {styled} from '@mui/material/styles';
 
 import {plot_ontology} from "./ontology-utils";
+import Alert from "@mui/material/Alert";
 
 
 const GLOBAL_MOL_PARAMS = {
@@ -74,6 +75,12 @@ const LayerComponent = (data) => {
     const handleChange = (event, newValue) => {
         setValue(newValue);
     };
+
+    if (data.mol === null) {
+      return (
+        <Alert severity="error">RDKit failed to process input!</Alert>
+      )
+    }
 
     return (
         <Box sx={{width: '100%', typography: 'body1'}}>
@@ -167,7 +174,6 @@ export function HighlightsBlocks(data) {
 export function DetailsBlockwise(data) {
     const handleClose = data.handleClose;
     data = data.model_data;
-
     var smiles = data.smiles
     var mol = null;
     if (!(smiles === null || smiles === undefined)) {
