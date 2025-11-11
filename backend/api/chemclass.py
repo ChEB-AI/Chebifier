@@ -122,7 +122,7 @@ class BatchPrediction(Resource):
         finally:
             ENSEMBLE.models = ensemble_models  # restore original model list
 
-        graphs_per_smiles = [CHEBI_FRAGMENT.subgraph(predicted) if predicted else None for predicted in all_predicted]
+        graphs_per_smiles = [CHEBI_FRAGMENT.subgraph(predicted) if predicted is not None else None for predicted in all_predicted]
 
         direct_parents = []
         for smiles_idx in range(len(all_predicted)):

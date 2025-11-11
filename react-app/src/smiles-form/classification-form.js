@@ -126,6 +126,10 @@ export default function ClassificationGrid() {
       return <Alert severity="error">Could not process input!</Alert>
     }
 
+    if (data.length === 0 && !predictionsLoading) {
+      return <Alert severity="info">No classes predicted.</Alert>
+    }
+
     // Collapsed view: chips flowing inline
     const collapsedView = (
       <Box sx={{display: 'flex', flexWrap: 'wrap', gap: 1}}>
@@ -555,7 +559,7 @@ export default function ClassificationGrid() {
                   {rows.length > 0 && (
                     <Box>
                       {rows.map((row) => {
-                        const canExpand = (row.direct_parents && row.direct_parents.length > 0) && !predictionsLoading;
+                        const canExpand = (row.direct_parents) && !predictionsLoading;
                         return (
                           <Paper key={row.id} sx={{p: 2, mb: 1}}
                                  onClick={(e) => {
