@@ -430,7 +430,7 @@ export default function ClassificationGrid() {
                           fontSize: '0.8rem'
                         }}
                       >
-                        Try methane
+                        Try methanol
                       </Button>
                       <Button
                         variant="text"
